@@ -82,4 +82,14 @@ prop_desaprobados(historia)
 
 ## [1] 0
 
+# Ejercicio 6
+
+ed_fisica <- c(NA,10,NA,9,NA,8)
+
+mean(ed_fisica, na.rm = T)
+# na.rm = T ignora los na
+
+## [1] 9
+
+# Ejercicio 7
 
