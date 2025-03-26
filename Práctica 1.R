@@ -93,3 +93,27 @@ mean(ed_fisica, na.rm = T)
 
 # Ejercicio 7
 
+# Primero tenemos que identificar la posición de esos chicos 
+
+which(is.na(ed_fisica))
+
+# [1] 1 3 5 
+
+# Y posteriormente tenemos que armar un subconjunto a partir de esas posiciones
+
+matematica_baja_asistencia <- matematica[c(1,3,5)]
+
+lengua_baja_asistencia <- lengua[c(1,3,5)]
+
+# Ejercicio 8
+
+prop_desaprobados(matematica_baja_asistencia)
+
+# [1] 0.6666667
+
+prop_desaprobados(lengua_baja_asistencia)
+
+# [1] 0.3333333
+
+# No necesariamente les va mal en todo. Pero les va mejor en matemática que en lengua
+
