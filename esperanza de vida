@@ -1,0 +1,29 @@
+install.packages("dplyr")
+install.packages("gapminder")
+library(gapminder)
+library(dplyr)
+
+gapminder <- gapminder
+str(gapminder)
+
+data_2007 <- gapminder %>% 
+  filter(year == 2007)
+  
+mean(data_2007$lifeExp)
+  
+
+esperanza_promedio_por_continente <- function() {
+  gapminder %>%
+    group_by(continent) %>%
+    summarise(esperanza_promedio = mean(lifeExp))
+}
+
+esperanza_promedio_por_continente_2007 <- function() {
+  gapminder %>%
+    filter(year == 2007) %>%
+    group_by(continent) %>%
+    summarise(esperanza_promedio = mean(lifeExp))
+}
+print(esperanza_promedio_por_continente())
+print(esperanza_promedio_por_continente_2007()) 
+  
