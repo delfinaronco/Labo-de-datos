@@ -1,0 +1,159 @@
+---
+title: "Taller de R Markdown e informes reproducibles"
+subtitle: "María Soledad Fernández - Federico Giovannetti"
+date: "2025-04-25"
+output:
+  html_document:
+    df_print: paged
+params:
+  include_code: yes
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Introducción
+
+El conjunto de datos Penguins, proporcionado por el paquete `palmerpenguins` en R, incluye información morfológica y ecológica de tres especies de pingüinos del archipiélago Palmer , ubicado en la Antártida: Adelie (*Pygoscelis adeliae*), Gentoo (*Pygoscelis papua*) y Chinstrap (*Pygoscelis antarcticus*). Las variables contenidas en el dataset incluyen medidas del pico, la aleta y el peso corporal, así como el sexo de los individuos y la isla en la que fueron observados.
+
+El conjunto de datos Penguins fue recopilado por un equipo de investigadores liderado por Dr. Kristen Gorman y está basado en observaciones de pingüinos realizadas en las islas del archipiélago Palmer en la Antártida. Estas observaciones forman parte de un esfuerzo más amplio para estudiar la biología y ecología de las especies de pingüinos en un entorno polar.
+
+Los datos fueron recolectados como parte del Antarctic Site Inventory (ASI), un proyecto dirigido por el Servicio Geológico de los Estados Unidos (USGS), cuyo objetivo es monitorear las poblaciones de animales en la región antártica. El dataset fue posteriormente disponible para la comunidad científica a través del paquete palmerpenguins, desarrollado por Allison Horst y otros. colaboradores.
+
+El **objetivo** de este taller es familiarizarse con herramientas de R Markdown.
+
+
+
+![Especies de pinguinos estudiadas Artwork by allison_horst](penguins.png){width=60%}
+
+
+
+### Ejercicios
+
+En esta serie de ejercicios tendrá que modificar o escribir código para poder responder las consignas. 
+
+
+#### Ejercicio 1
+
+**a)** Explorar el data.frame (se muestran algunos comandos a modo de ayuda). En el reporte no debe aparecer ningún código de este ítem.
+
+
+```{r echo=FALSE}
+library(palmerpenguins)
+datos <- data.frame(penguins)
+
+```
+
+#### Ejercicio 2
+
+**a)** Explorar el data.frame. En el reporte no debe aparecer ningún tipo de código de este ítem, pero si una tabla con las primeras 6 filas del data.frame. 
+
+
+```{r, echo= FALSE}
+knitr::kable(head(datos), caption = "Primeras filas dataset penguins")
+```
+
+
+
+**b)** Calcular el promedio y el desvío estándar de la masa corporal del total de los pinguinos machos observados durante el año 2009. Informar dicho resultado en un parrafo que contenga el resultado obtenido a partir del código utilizado. Reportar el valor en el texto del informe (no mostrar el código)
+
+```{r, echo=FALSE}
+library(dplyr)
+datos_machos_2009 <- datos %>% 
+ filter(year == 2009 & sex == "male")  
+
+prom_bm_male2009 <- round(mean(datos_machos_2009$body_mass_g),2)
+sd_bm_male2009 <- round(sd(datos_machos_2009$body_mass_g),2)
+```
+
+
+El peso promedio de pinguinos machos observados durente el año 2009 resultó de `r prom_bm_male2009` gramos con un desvío de `r sd_bm_male2009` gramos.  
+
+
+#### Ejercicio 3
+
+**a)** Reportar gráficamente la cantidad de datos faltantes por variable (ayuda: se pueden usar gráficos generados por la library(visdat)). Escriba en texto una conclusión a partir de dicho gráfico. 
+
+```{r, echo=FALSE, fig.align='center'}
+library(visdat)
+vis_miss(datos)
+```
+
+Hay más datos faltantes en sex
+
+
+**b)** Explorar la relación entre largo de la aleta y peso corporal, para cada una de las especies y sexos. Concluir acerca de lo observado en los gráficos.
+
+```{r, echo=FALSE, warning=FALSE, fig.align='center'}
+library(ggplot2)
+ggplot(datos, mapping = aes(x= flipper_length_mm, y=body_mass_g, color=species, shape=sex)) +
+  geom_point() + 
+  labs(
+    title = "Relación entre el largo de la aleta y el peso corporal",
+    x = "Largo de la aleta",
+    y = "Peso corporal en gramos"
+  ) + theme_bw() 
+```
+Cuanto más larga es la aleta, más peso tienen.
+
+**c)** Modificar los chunk de los ítems a y b para que los gráficos aparezcan centrados y con un tamaño adecuado. 
+
+
+#### Ejercicio 4
+
+A partir de los datos del dataset gapminder, de la libreria del mismo nombre elijan una de las preguntas/objetivos que figuran abajo (o piensen otra de similares características) y elabore un reporte. El reporte debe incluir, al menos:
+
+- una tabla
+- un grafico
+- una imagen
+- texto en diferentes secciones del reporte
+
+y no debe superar las 4 carillas.
+
+**Posibles preguntas/objetivos** (elegir solo una de ellas)
+
+1. Análisis de la evolución de la esperanza de vida en el Mercosur desde 1952 hasta 2007
+
+2. ¿Cómo varió el PBI per cápita entre los países de América Central en los últimos 10 años
+
+3. Comparación de la esperanza de vida entre países escandinavos para el año 2007
+
+4. ¿Qué país del sudeste asiático tuvo el mayor crecimiento del PBI per cápita entre 1952 y 2007?
+
+5. Analizar la relación entre esperanza de vida y PBI per cápita en países del G7 en el año 2007
+
+
+
+A modo de ayuda les dejamos el código para acceder a los datos:
+
+Elejimos el punto 5 
+
+```{r, echo=FALSE}
+library(gapminder)
+
+datos_2007 <- gapminder %>%
+  filter(year == 2007, country == "Germany" | country == "Canada" | country == "United States" | country == "France" | country == "Italy" | country == "Japan" | country == "United Kingdom")
+
+data <- gapminder %>% mutate(year =as.factor(year)) %>%
+  filter(country == "Germany" | country == "Canada" | country == "United States" | country == "France" | country == "Italy" | country == "Japan" | country == "United Kingdom")
+
+
+knitr::kable(datos_2007[1:6], caption = "Países del G7 en 2007")
+```
+La relación entre la esperanza de vida y el PBI per cápita para los países del G7 
+
+```{r, echo=FALSE, warning=FALSE}
+
+library(ggplot2)
+
+ggplot(data, mapping = aes(x = lifeExp, y = gdpPercap, color = year, shape = country)) +
+  geom_point()
+
+
+
+
+```
+
+Como se puede ver en el grafico a medida que pasan los años la eperanza de vida y el PBI aumenta. 
