@@ -59,7 +59,7 @@ knitr::kable(head(datos), caption = "Primeras filas dataset penguins")
 
 **b)** Calcular el promedio y el desvío estándar de la masa corporal del total de los pinguinos machos observados durante el año 2009. Informar dicho resultado en un parrafo que contenga el resultado obtenido a partir del código utilizado. Reportar el valor en el texto del informe (no mostrar el código)
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE}
 library(dplyr)
 datos_machos_2009 <- datos %>% 
  filter(year == 2009 & sex == "male")  
@@ -93,7 +93,7 @@ ggplot(datos, mapping = aes(x= flipper_length_mm, y=body_mass_g, color=species, 
   labs(
     title = "Relación entre el largo de la aleta y el peso corporal",
     x = "Largo de la aleta",
-    y = "Peso corporal en gramos"
+    y = "Peso corporal en gramos",
   ) + theme_bw() 
 ```
 Cuanto más larga es la aleta, más peso tienen.
@@ -128,32 +128,70 @@ y no debe superar las 4 carillas.
 
 A modo de ayuda les dejamos el código para acceder a los datos:
 
-Elejimos el punto 5 
+Elejimos el punto 5: La relación entre esperanza de vida y PBI per cápita en países del G7 en el año 2007
+
+![G7](G7.png)
 
 ```{r, echo=FALSE}
 library(gapminder)
+library(dplyr)
 
 datos_2007 <- gapminder %>%
-  filter(year == 2007, country == "Germany" | country == "Canada" | country == "United States" | country == "France" | country == "Italy" | country == "Japan" | country == "United Kingdom")
+  filter(year == 2007, country %in% c("Germany", "Canada", "United States", "France", "Italy", "Japan", "United Kingdom")) %>%
+  select(country, lifeExp, gdpPercap) %>%
+  rename(
+    País = country,
+    Esperanza_de_Vida = lifeExp,
+    PBI_per_Cápita = gdpPercap
+  ) %>%
+  mutate(País = case_when(
+    País == "Germany" ~ "Alemania",
+    País == "Canada" ~ "Canadá",
+    País == "United States" ~ "Estados Unidos",
+    País == "France" ~ "Francia",
+    País == "Italy" ~ "Italia",
+    País == "Japan" ~ "Japón",
+    País == "United Kingdom" ~ "Reino Unido",
+    TRUE ~ País
+  )) %>%
+  arrange(desc(Esperanza_de_Vida))
 
-data <- gapminder %>% mutate(year =as.factor(year)) %>%
-  filter(country == "Germany" | country == "Canada" | country == "United States" | country == "France" | country == "Italy" | country == "Japan" | country == "United Kingdom")
 
-
-knitr::kable(datos_2007[1:6], caption = "Países del G7 en 2007")
+knitr::kable(datos_2007[1:3], caption = "Esperanza de vida y PBI per cápita de los países del G7 en 2007")
 ```
-La relación entre la esperanza de vida y el PBI per cápita para los países del G7 
+Podemos observar que el país del G7 con mayor esperanza de vida es Japón, sin embargo, su PBI per cápita no es el más alto. De hecho, el PBI per cápita más alto es el de Estados Unidos, cuya esperanza de vida es la más baja de todos. 
+
+Ahora veamos cómo fue evolucionando a través de los años.
 
 ```{r, echo=FALSE, warning=FALSE}
 
 library(ggplot2)
 
+data <- gapminder %>% mutate(year =as.factor(year)) %>%
+  filter(country == "Germany" | country == "Canada" | country == "United States" | country == "France" | country == "Italy" | country == "Japan" | country == "United Kingdom")
+
 ggplot(data, mapping = aes(x = lifeExp, y = gdpPercap, color = year, shape = country)) +
-  geom_point()
+  geom_point(size = 3, alpha = 0.9, stroke = 1) +
+  scale_shape_manual(
+    values = c(0, 1, 2, 3, 4, 5, 6), # Asigno 7 formas distintas
+    labels = c("Alemania", "Canadá", "Estados Unidos", "Francia", "Italia", "Japón", "Reino Unido")
+  ) +
+  guides(
+    color = guide_legend(title = "Año", position = "right"),
+    shape = guide_legend(title = "País", position = "bottom")
+  ) +
+   labs(
+    title = "Esperanza de vida y PBI per cápita de los países del G7 desde 1952 al 2007",
+    x = "Esperanza de vida",
+    y = "PBI per cápita"
+  ) +
+  theme(legend.box = "vertical")
 
 
 
 
 ```
 
-Como se puede ver en el grafico a medida que pasan los años la eperanza de vida y el PBI aumenta. 
+Como se puede ver en el gráfico a medida que pasan los años la eperanza de vida y el PBI aumentan. 
+
+
