@@ -1,0 +1,14 @@
+rm(list=ls())
+
+data <- read.table("datos_libreta_80823.txt")
+
+str(data)
+summary(data)
+plot(data$ID~datos$RU)
+
+m1 <- lm(ID ~ RU, data)
+m1
+
+ggplot(data, aes(x = RU, y = ID)) + geom_point() + geom_smooth(method = "lm", se = FALSE, color = "blue", size=1.5)
+
+summary(m1)$r.squared # = R²
