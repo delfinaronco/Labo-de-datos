@@ -88,3 +88,10 @@ ggplot(gentoo_data, aes(x = bill_depth_mm, y = bill_length_mm)) +
 
 # 1.9 Sólo para los pinguinos de la especie “Chinstrap”, definir una nueva variable que sea el ancho del pico centrado respecto al ancho promedio. Es decir, para cada pinguino calcular ancho_centrado = ancho_i - ancho_promedio.  Repetir el ítem 1.3 para el modelo con ancho del pico centrado respecto del promedio.
 
+data <- chinstrap_data %>%
+  mutate(ancho_centrado = bill_depth_mm - mean(bill_depth_mm))
+
+modelo <- lm(bill_length_mm ~ ancho_centrado, data)
+modelo
+
+El modelo predice la recta: bill_length_mm = 1.922 * ancho_centrado + 48.834.
