@@ -1,0 +1,304 @@
+## Ejercicio 1
+
+### 1.1 Utilizando la librería mtcars incluida en R-base, que contiene datos sobre automóviles (dataset mtcars), crear un gráfico para visualizar la relación entre la potencia del motor (columna hp) y la eficiencia en millas por galón (columna mpg). ¿Qué patrón se observa?
+
+```{r}
+library(ggplot2)
+library(dplyr)
+data(mtcars)
+
+ggplot(mtcars, aes(x = hp, y = mpg)) +
+  geom_point(color = "steelblue", size = 3) +
+  labs(title = "Relación entre Potencia del Motor (hp) y Eficiencia (mpg)",
+       x = "Potencia (hp)",
+       y = "Millas por galón (mpg)") +
+  theme_minimal()
+```
+
+### 1.2 Ajustar una regresión polinomial (decidir el grado del polinomio) para predecir la eficiencia en millas por galón en función de la potencia del motor.
+
+```{r}
+modelo_poly2 <- lm(mpg ~ poly(hp, 2), data = mtcars)
+modelo_poly2
+
+predict(modelo_poly2)
+
+summary(modelo_poly2)$adj.r.squared
+```
+### 1.3 Presentar un gráfico que muestre el modelo ajustado (valores predichos) y los valores observados.
+
+```{r}
+ggplot(mtcars, aes(x = hp, y = mpg)) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), color = "darkred", se = FALSE) +
+  labs(title = "Ajuste polinomial (grado 2): mpg vs hp",
+       x = "Potencia (hp)",
+       y = "Millas por galón (mpg)") +
+  theme_minimal()
+```
+## Ejercicio 2
+
+### 2.1 Cargar la librería gapminder. Seleccionar datos del año 2002 y realizar un gráfico de dispersión que muestre la relación entre el PIB per cápita (columna gdpPercap) y la esperanza de vida (columna lifeExp).
+
+```{r}
+library(gapminder)
+
+gapminder_2002 <- gapminder %>%
+  filter(year == 2002)
+
+ggplot(gapminder_2002, aes(x = gdpPercap, y = lifeExp)) +
+  geom_point(color = "steelblue", size = 2) + 
+  scale_x_log10() + # log en el eje x para mejor visualización
+  labs(title = "Relación entre PBI per cápita y Esperanza de vida (2002)",
+       x = "PBI per cápita (log scale)",
+       y = "Esperanza de vida") +
+  theme_minimal()
+
+```
+
+### 2.2 Ajustar una funcion polinomial seleccionando el grado del polinomio en base al MSE de prediccion.
+
+```{r}
+calcular_mse <- function(grado, datos) {
+  modelo <- lm(lifeExp ~ poly(gdpPercap, grado), data = datos)
+  pred <- predict(modelo, datos)
+  mse <- mean((datos$lifeExp - pred)^2)
+  return(mse)
+}
+
+mse_por_grado <- sapply(1:5, calcular_mse, datos = gapminder_2002)
+print(mse_por_grado)
+```
+
+El mejor grado es el que tiene eL MSE más bajo, en este caso el 5.
+
+
+### 2.3 Presentar un gráfico que muestre el modelo ajustado (valores predichos) y los valores observados.
+
+```{r}
+ggplot(gapminder_2002, aes(x = gdpPercap, y = lifeExp)) +
+  geom_point() +
+  scale_x_log10() +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 5), se = FALSE, color = "blue") +
+  labs(title = "Esperanza de vida vs PIB per cápita (2002) con ajuste polinomial grado 5",
+       x = "PIB per cápita (escala log)",
+       y = "Esperanza de vida")
+```
+## Ejercicio 3
+Una consultora económica está estudiando la relación entre el nivel de ingreso mensual de los consumidores
+(expresado en miles de dólares) y su nivel de gasto en bienes de lujo, en particular gastos en restaurants (en
+dólares). Se presume que esta relación no es lineal: a ingresos bajos, el gasto es limitado; a ingresos medios, los
+consumidores gastan más; pero a ingresos altos, el gasto tiende a estabilizarse o incluso disminuir, posiblemente
+debido a un cambio de hábitos financieros (ahorro, inversión, etc.). La base de datos datosGastoLujo.csv contiene información sobre ingresos y gastos en bienes de lujo (ambos en dolares) de 200 consumidores (es
+una base de datos “de juguete”).
+
+### 3.1 Cargar los datos y explorar
+
+```{r}
+
+head(datosGastoLujo)
+str(datosGastoLujo)
+summary(datosGastoLujo)
+```
+
+### 3.2 Modelar la relación entre el ingreso y el gasto en bienes de lujo utilizando regresión polinomial y determinar cuál es el mejor grado del polinomio para predecir el gasto, evaluando el desempeño mediante validación cruzada.
+
+```{r}
+ggplot(datosGastoLujo, aes(x = ingreso, y = gasto)) +
+  geom_point() +
+  labs(title = "Gasto en bienes de lujo vs Ingreso mensual",
+       x = "Ingreso mensual (en miles de dólares)",
+       y = "Gasto en bienes de lujo (USD)")
+```
+
+```{r}
+library(boot)
+
+cv.error <- rep(0, 10)
+for (i in 1:10) {
+ glm.fit <- glm(gasto ~ poly(ingreso , i), data = datosGastoLujo)
+ cv.error[i] <- cv.glm(datosGastoLujo, glm.fit)$delta[1]
+ }
+cv.error
+
+mejor_grado <- which.min(cv.error)
+print(mejor_grado)
+```
+El mejor grado para predecir el gasto es el 3.
+
+```{r}
+ggplot(datosGastoLujo, aes(x = ingreso, y = gasto)) +
+  geom_point() + geom_smooth(method="lm",formula = y ~ poly(x, 3), color = "darkred", se = FALSE) +
+  labs(title = "Gasto en bienes de lujo vs Ingreso mensual",
+       x = "Ingreso mensual (en miles de dólares)",
+       y = "Gasto en bienes de lujo (USD)")
+```
+
+```{r}
+modelo_final <- lm(gasto ~ poly(ingreso, mejor_grado), data = datosGastoLujo)
+print(modelo_final)
+```
+
+## Ejercicio 4
+
+Este ejercicio se basa en el R Labs del libro An Introduction to Statistical Learning - Capítulo 5 - Resampling
+methods. La versión original (y completa) del codigo comentado se encuentra disponible en: https://web.st
+anford.edu/~hastie/ISLR2/Labs/Rmarkdown_Notebooks/Ch5-resample-lab.Rmd
+
+### 4.1 Cargar el dataset Auto de la librería ISLR2 y explorarlo.
+
+```{r}
+library(ISLR2)
+
+set.seed(1)
+train <- sample(392, 196) # selecciona 196 "posiciones" (de las posibles 392)
+```
+
+Ajuste del modelo con el subset de entrenamiento (train)
+
+```{r}
+lm.fit <- lm(mpg ~ horsepower, data = Auto, subset = train)
+```
+
+Calculo del MSE con el set de validacion (-train index selecciona solo las observaciones que no están en el
+training set.)
+
+```{r}
+attach(Auto) # ojo con attach
+mean((mpg - predict(lm.fit, Auto))[-train]^2)
+
+```
+Ajustar regresiones polinomicas (función poly()) y estimar el error de testeo para un polinomio grado 2 y
+uno grado 3
+
+```{r}
+lm.fit2 <- lm(mpg ~ poly(horsepower, 2), data = Auto, subset = train)
+
+mean((mpg - predict(lm.fit2, Auto))[-train]^2)
+
+lm.fit3 <- lm(mpg ~ poly(horsepower, 3), data = Auto, subset = train)
+
+mean((mpg - predict(lm.fit3, Auto))[-train]^2)
+```
+
+Anotar los valores obtenidos. Cambiar la semilla (ejemplo set.seed(2)), de manera que el training set se
+modifique. ¿Qué ocurrió con el error de testeo en ambos polinomios? Discutir los resultados obtenidos.
+
+Ambos dan casi lo mismo.
+Ahora cambiemos de semilla
+
+```{r}
+set.seed(2)
+
+train=sample (392,196)
+
+lm.fit <- lm(mpg ~ horsepower, subset = train)
+
+lm.fit2 <- lm(mpg ~ poly(horsepower, 2), data = Auto, subset = train)
+
+mean((mpg - predict(lm.fit2, Auto))[-train]^2)
+
+lm.fit3 <- lm(mpg ~ poly(horsepower, 3), data = Auto, subset = train)
+
+mean((mpg - predict(lm.fit3, Auto))[-train]^2)
+```
+Ahora nos dan números distintos.
+
+Conclusión clave: los resultados de la validación simple dependen del split aleatorio. Cambiar la semilla cambia los datos que "ve" el modelo, y por lo tanto el error.
+
+Esto muestra por qué es mejor usar métodos más robustos como validación cruzada (LOOCV o k-fold), que promedian el error sobre muchos splits distintos y reducen la variabilidad del resultado.
+
+### Leave-One-Out Cross-Validation
+
+En esta parte, utilizaremos la función glm() en lugar de lm(), ya que la primera puede usarse junto con
+cv.glm(). La función cv.glm() forma parte de la biblioteca boot.
+Si utilizamos la función glm() sin especificar el argumento family, por defecto se ajusta un modelo de
+regresión lineal, de manera equivalente a lo que hace la función lm(). En la versión completa del script se
+ofrece un ejemplo de esto.
+
+```{r}
+library(boot)
+glm.fit <- glm(mpg ~ horsepower, data = Auto)
+cv.err <- cv.glm(Auto, glm.fit)
+cv.err$delta
+
+```
+La función cv.glm() devuelve una lista con varios componentes. Los dos números en el vector delta contienen
+los resultados de la validación cruzada. En este caso, los números son idénticos (hasta dos cifras decimales) y
+corresponden a la estadística de validación cruzada Leave-One-Out (LOOCV) presentada en la ecuación (5.1,
+ref al libro) (Más adelante, se muestra una situación en la que estos dos números difieren)
+Podemos repetir este procedimiento con ajustes polinomiales de complejidad (grado) creciente. Para automatizar el proceso, usamos la for(). Discutir los resultados obtenidos.
+
+```{r}
+cv.error <- rep(0, 10)
+for (i in 1:10) {
+glm.fit <- glm(mpg ~ poly(horsepower, i), data = Auto)
+cv.error[i] <- cv.glm(Auto, glm.fit)$delta[1]
+}
+cv.error
+
+```
+
+### k-Fold Cross-Validation
+
+Observar el código. ¿Qué se modifica respecto al código presentado para LOOCV? Discutir los resultados
+obtenidos.
+
+```{r}
+set.seed(17)
+cv.error.10 <- rep(0, 10)
+for (i in 1:10) {
+glm.fit <- glm(mpg ~ poly(horsepower, i), data = Auto)
+cv.error.10[i] <- cv.glm(Auto, glm.fit, K = 10)$delta[1]
+}
+cv.error.10
+```
+
+Nota: los dos números asociados con delta son esencialmente los mismos cuando se realiza LOOCV. Cuando,
+en cambio, se reliza un CV de k veces, los dos números asociados con delta difieren ligeramente. El primero
+es la estimación estándar de CV de k veces, y el segundo es una versión con corrección de sesgo. En este
+conjunto de datos, las dos estimaciones son muy similares.
+
+### Diferencia entre LOOCV y k-Fold CV (en el código)
+
+#### LOOCV (Leave-One-Out Cross-Validation):
+
+cv.glm(Auto, glm.fit)
+
+- No se especifica el parámetro K, por lo tanto cv.glm() realiza LOOCV automáticamente.
+
+- Usa n modelos, donde n = número de observaciones (una observación queda afuera en cada iteración).
+
+Ejemplo:
+
+cv.error.loocv[i] <- cv.glm(Auto, glm.fit)$delta[1]
+
+#### k-Fold CV (por ejemplo, con k = 10):
+
+cv.glm(Auto, glm.fit, K = 10)
+
+- Se agrega el argumento K = 10, indicando que se usará 10-fold cross-validation.
+
+- Divide los datos en 10 partes, entrena el modelo en 9 y prueba en la 10ª, repitiendo el proceso 10 veces.
+
+Ejemplo:
+
+cv.error.k10[i] <- cv.glm(Auto, glm.fit, K = 10)$delta[1]
+
+#### Discusión de los resultados
+
+- Ambos métodos evalúan el error de predicción para distintos grados del polinomio, pero:
+
+  - LOOCV tiene alta varianza, porque cada modelo se entrena con solo 1 observación menos.
+
+  - k-Fold CV (k=10) tiene menor varianza y es más eficiente computacionalmente.
+
+- En la práctica, los errores obtenidos por ambos métodos son muy similares, pero puede haber pequeñas diferencias en los valores de MSE y en el grado óptimo elegido.
+
+- En este caso (como en muchos problemas de regresión), ambos métodos tienden a seleccionar un grado moderado (por ejemplo, grado 2 o 3) que balancea sesgo y varianza.
+
+#### Conclusión
+
+La diferencia principal en el código es la inclusión del argumento K = 10 en cv.glm() para realizar k-fold cross-validation en lugar de LOOCV.
+Ambos métodos arrojan resultados similares en este dataset, pero k-fold es más eficiente y menos sensible a pequeñas fluctuaciones en los datos. Por eso, es una práctica común preferir k-fold CV con k = 5 o 10 en problemas reales.
+
