@@ -1,0 +1,163 @@
+---
+title: "Práctica Regresión Lineal Múltiple"
+output: html_document
+date: "2025-05-29"
+---
+
+## Ejercicio 1
+
+Utilizando la base de datos “iris” (Fisher, 1936):
+### 1.1. Implementá una regresión lineal simple para predecir la longitud del sépalo (columna Sepal.Length) en función del ancho del sépalo (columna Sepal.Width).
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(boot)
+
+data(iris)
+
+modelo_iris <- lm(Sepal.Length ~ Sepal.Width, data = iris)
+modelo_iris
+
+r2_iris <- summary(modelo_iris)$r.squared
+r2_iris
+
+# r2 = 0.01382 → el modelo explica solo el 1.38% de la variación en la longitud del sépalo.
+```
+
+### 1.2. Implementá una regresión lineal múltiple para predecir la longitud del sépalo en función del ancho del sépalo y la variable especiey su interacción con la variable especie. Realizar un modelo aditivo y un modelo de interacción.
+
+```{r}
+modelo_aditivo <- lm(Sepal.Length ~ Sepal.Width + Species, data = iris)
+summary(modelo_aditivo)
+
+modelo_interaccion <- lm(Sepal.Length ~ Sepal.Width * Species, data = iris)
+summary(modelo_interaccion)
+```
+1.3. A partir del cálculo de R2 ¿Qué diferencias existen entre los tres modelos?¿Cuál es el mejor modelo?
+¿Por qué?
+
+```{r}
+r2_aditivo <- summary(modelo_aditivo)$r.squared
+r2_interaccion <- summary(modelo_interaccion)$r.squared
+
+comparacion_r2 <- data.frame(
+  Modelo = c("Simple", "Aditivo", "Interacción"),
+  R2 = c(r2_iris, r2_aditivo, r2_interaccion)
+)
+
+print(comparacion_r2)
+```
+El modelo simple explica solo una parte limitada de la variación.
+
+El modelo aditivo mejora la explicación al considerar diferencias entre especies.
+
+El modelo con interacción permite que la relación entre Sepal.Width y Sepal.Length cambie según la especie, y suele tener el mayor R² → mejor ajuste.
+
+## Ejercicio 2
+
+Vamos a trabajar con el dataset ‘Life_Expectancy_2015’ preprocesado con información sobre la expectativa
+de vida para distintos países en el 2015. Las variables incluidas son:
+Country: País
+Status: Nivel económico del país
+Life.expectancy: Expectativa de vida
+infant.deaths: Mortandad infantil
+Hepatitis.B: Nivel de inmunización contra hepatitis B en niños
+Measles: Casos de sarampión en toda la población
+BMI: Masa corporal promedio de la población
+Polio: Nivel de inmunización contra la polio en niños
+Diphtheria: Nivel de inmunización contra la difteria en niños
+HIV.AIDS: Mortandad infantil asociada a VIH-SIDA
+GDP: PBI per cápita
+Population: Población
+Schooling: Nivel de escolaridad promedio
+
+Nos interesa testear cuatro posibles modelos explicativos:
+
+  - Modelo macro: centrado en variables generales sobre el país (GDP y Population)
+
+  - Modelo inmunización: centrado en variables indicadoras del nivel de inmunización (Hepatitis.B, Polio, Diphtheria)
+  
+  - Modelo infancia: centrado en variables indicadoras de vulnerabilidad infantil (infant.deaths, HIV.AIDS, Measles, Schooling)
+
+  - Modelo propio: Proponer un modelo que incorpore una variable de cada uno de los modelos anteriores.
+
+
+### 2.1. Correr cada uno de los modelos.
+
+```{r}
+setwd("c:/Users/Usuario/OneDrive/Documentos/DATOS/labo de datos")
+
+life_exp <- read.csv("Life_Expectancy_2015.csv")
+
+# Modelo macro (GDP y Population)
+
+formula_macro <- "Life.expectancy ~ log(GDP) + Population"
+glm_macro <- glm(formula_macro, data = life_exp)
+MSE_macro <- cv.glm(life_exp, glm_macro)$delta[1]
+lm_macro <- lm(formula_macro, data = life_exp)
+r2_macro <- summary(lm_macro)$r.squared
+
+# Modelo inmunización
+formula_inmunizacion <- c("Life.expectancy ~ Hepatitis.B + Polio + Diphtheria")
+glm_inmunizacion <- glm(formula_inmunizacion, data = life_exp)
+MSE_inmunizacion <- cv.glm(life_exp, glm_inmunizacion)$delta[1]
+lm_inmunizacion <- lm(formula_inmunizacion, data = life_exp)
+r2_inmunizacion <- summary(lm_inmunizacion)$r.squared
+
+# Modelo infancia
+
+formula_infancia <- c("Life.expectancy ~ infant.deaths + HIV.AIDS + Measles + Schooling")
+glm_infancia <- glm(formula_infancia, data = life_exp)
+MSE_infancia <- cv.glm(life_exp, glm_infancia)$delta[1]
+lm_infancia <- lm(formula_infancia, data = life_exp)
+r2_infancia <- summary(lm_infancia)$r.squared
+
+# Modelo propio
+
+formula_propia <- c("Life.expectancy ~ log(GDP) + Population + Hepatitis.B + Polio + Diphtheria + infant.deaths + HIV.AIDS + Measles + Schooling")
+glm_propia <- glm(formula_propia, data = life_exp)
+MSE_propia <- cv.glm(life_exp, glm_propia)$delta[1]
+lm_propia <- lm(formula_propia, data = life_exp)
+r2_propia <- summary(lm_propia)$r.squared
+
+
+```
+
+### 2.2. Calcular los valores de r2 y MSE para cada uno de ellos e insertarlos en una tabla.
+
+```{r}
+modelos <- data.frame(
+  Modelo = c("Macro", "Inmunización", "Infancia","Propio"),
+  R2 = c(r2_macro, r2_inmunizacion, r2_infancia, r2_propia),
+  MSE = c(MSE_macro, MSE_inmunizacion, MSE_infancia, MSE_propia)
+)
+
+print(modelos)
+```
+
+### 2.3. Realizar un gráfico que indique cuál es el mejor modelo.
+
+```{r}
+ggplot(modelos, aes(x = Modelo, y = MSE, fill = Modelo)) +
+  geom_col() +
+  labs(title = "Comparación de MSE entre modelos",
+       y = "MSE",
+       x = "Modelo") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(modelos, aes(x = Modelo, y = R2, fill = Modelo)) +
+  geom_col() +
+  labs(title = "Comparación de R² entre modelos",
+       y = "R²",
+       x = "Modelo") +
+  theme_minimal()
+```
+El mejor modelo es el propio (o el de infancia).
+
+### 2.4. Implementar una función a la cual podamos brindarle distintas fórmulas (y ~ x1 + x2 + xi) y que devuelva un gráfico mostrando los distintos valores de R2 y MSE.
+
+
+
