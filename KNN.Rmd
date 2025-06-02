@@ -1,0 +1,181 @@
+---
+title: "KNN"
+output: html_document
+date: "2025-06-02"
+---
+
+## Ejercicio 1
+
+Este ejercicio está basado en un caso de estudio presentado en el libro Data Science A First Introduction de Tiffany Timbers, Trevor Campbell y Melissa Lee (capítulo 5), disponible en https://datasciencebook.ca/
+
+Sobre el dataset: Wolberg, W., Mangasarian, O., Street, N., y Street, W. (1993). Breast Cancer Wisconsin (Diagnostic) [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5DW2B.
+
+Por cuestiones practicas para comenzar el ejercicio se ofrece un dataset pre-procesado.
+
+Librerias
+
+```{r}
+library(tidymodels)
+library(kknn)
+library(tidyverse)
+```
+
+Abrir el dataset y explorar
+Recordar las recomendaciones sobre el entorno y el directorio de trabajo
+El dataset se llama datosTP.csv
+Verificar los tipos de variables
+La variable Class debe estar como factor, si no lo está, convertirla.
+
+```{r}
+setwd("c:/Users/Usuario/OneDrive/Documentos/DATOS/labo de datos")
+
+datos <- read.csv("datosTP.csv")
+```
+
+Seleccionar el conjunto de entrenamiento
+
+```{r}
+datos_train <- datos %>% 
+  select(Class, Perimeter, Concavity)
+```
+
+Especificación del modelo
+
+```{r}
+knn_spec <- nearest_neighbor(weight_func = "rectangular", neighbors = 5) %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+```
+
+Ajuste del modelo
+
+```{r}
+datos_train$Class <- as.factor(datos_train$Class)
+
+knn_fit <-  knn_spec %>% 
+  fit(Class ~  Perimeter + Concavity, data = datos_train)
+```
+
+Predicciones
+Nueva observacion: Perimeter = 0, Concavity = 3.5 (estandarizada)
+
+```{r}
+new_obs <- tibble(Perimeter = 0, Concavity = 3.5)
+predict(knn_fit, new_obs)
+```
+
+Evaluacion de desempeño: set de entrenamiento y de testeo
+Exploracion del dataset (total)
+- Abrir el dataset, sin las variables estandarizadas: datos_unscaled.csv
+
+```{r}
+datos_unscaled <- read.csv("datos_unscaled.csv") 
+```
+
+- Explorar el dataset
+
+- Graficar Concavity vs Smoothness, discriminando por Class
+
+```{r}
+ggplot(datos, aes(x = Concavity, y = Smoothness, color = Class)) +
+  geom_point() + scale_color_manual(values = c("Benign" = "forestgreen", "Malignant" = "red")) +
+  labs(title = "Concavity vs Smoothness",
+       y = "Smoothness",
+       x = "Concavity") +
+  theme_minimal()
+```
+
+
+Particion del dataset
+- Fijar una semilla
+
+```{r}
+datos_split <- initial_split(datos_unscaled, prop = 0.75, strata = Class)
+```
+
+Training y Testing sets
+
+```{r}
+datos_train <- training(datos_split)
+datos_test <- testing(datos_split) 
+```
+
+Podemos chequear las proporciones de clases en cada subset
+
+```{r}
+proportionstrain <- datos_train %>% 
+                      group_by(Class) %>% 
+                      summarize(n = n()) %>% 
+                      mutate(percent = 100*n/nrow(datos_train))
+proportionstrain
+```
+
+Pre-procesamiento de datos: “receta” del paquete recetas
+Una receta es una descripción de los pasos que deben aplicarse a un conjunto de datos con el fin de prepararlo para el análisis de datos.
+
+La “receta” comienza especificando que para los datos datos_train, la clase es la respuesta y Smoothness y Concavity se utilizarán como predictoras.
+
+Como KNN es sensible a la escala (de las variables predictoras), las estandarizamos
+
+```{r}
+datos_recipe <- recipe(Class ~ Smoothness + Concavity, 
+                        data = datos_train)  %>% 
+                step_scale(all_predictors()) %>% 
+                step_center(all_predictors())
+```
+
+Entrenamiento del clasificador
+Ahora que hemos dividido nuestro conjunto de datos original en conjuntos de entrenamiento y prueba, podemos crear nuestro clasificador KNN solo con el conjunto de entrenamiento.
+
+Elegimos un numero de vecinos más cercanos (por ahora de manera “arbitraria” elegimos K=3
+). Mas adelante veremos como podemos elegir este numero
+
+Recordemos que usamos Concavity y Smoothness como predictoras (lo especificamos en nuestra “receta”)
+
+```{r}
+knn_spec <- nearest_neighbor(weight_func="rectangular", neighbors = 3) %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+```
+
+workflow example
+
+```{r}
+knn_fit <- workflow() %>%                 # 1. Crea un "pipeline" vacío de modelado
+  add_recipe(datos_recipe) %>%            # 2. Agrega el preprocesamiento (receta)
+  add_model(knn_spec) %>%                 # 3. Agrega el modelo (por ejemplo, KNN)
+  fit(data = datos_train)                 # 4. Ajusta (entrena) el modelo con los datos
+
+knn_fit
+```
+Predicciones
+Ahora que tenemos un clasificador KNN, podemos usarlo para predecir las “etiquetas” de la clase del conjunto de datos de testeo.
+
+```{r}
+datos_test_predictions <- predict(knn_fit, datos_test) %>% 
+  bind_cols(datos_test)
+
+head(datos_test_predictions)
+```
+
+Usamos bind_cols para agregar la columna de predicciones a los datos de prueba originales, creando así el dataframe datos_test_predictions.
+
+La variable Class contiene los diagnósticos verdaderos, mientras que .pred_class contiene los diagnósticos predichos por el clasificador.
+
+Evaluación del desempeño
+
+```{r}
+datos_test_predictions %>% 
+  metrics(truth = Class, estimate = .pred_class) %>% 
+  filter(.metric == "accuracy")
+```
+
+Matriz de confusion
+
+```{r}
+confusion <- datos_test_predictions %>% 
+             conf_mat(truth = Class, estimate = .pred_class)
+confusion
+```
+
+- Calcular las métricas de desempeño vistas en clase
