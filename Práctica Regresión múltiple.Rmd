@@ -159,5 +159,118 @@ El mejor modelo es el propio (o el de infancia).
 
 ### 2.4. Implementar una función a la cual podamos brindarle distintas fórmulas (y ~ x1 + x2 + xi) y que devuelva un gráfico mostrando los distintos valores de R2 y MSE.
 
+```{r}
+comparar_modelos <- function(data, formulas) {
+  resultados <- data.frame(Modelo = character(), R2 = numeric(), MSE = numeric())
+  
+  for (nombre in names(formulas)) {
+    f <- formulas[[nombre]]
+    glm <- glm(f, data = data)
+    lm <- lm(f, data)
+    r2 <- summary(lm)$r.squared
+    mse <- cv.glm(data, glm)$delta[1]
+    resultados <- rbind(resultados, data.frame(Modelo = nombre, R2 = r2, MSE = mse))
+  }
+  
+  # Gráfico R2
+  p1 <- ggplot(resultados, aes(x = Modelo, y = R2, fill = Modelo)) +
+    geom_col(show.legend = FALSE) +
+    theme_minimal() +
+    labs(title = "R² por modelo", y = "R²", x = "")
+  
+  # Gráfico MSE
+  p2 <- ggplot(resultados, aes(x = Modelo, y = MSE, fill = Modelo)) +
+    geom_col(show.legend = FALSE) +
+    theme_minimal() +
+    labs(title = "MSE por modelo", y = "MSE", x = "")
+  
+  print(p1)
+  print(p2)
+}
+formulas <- list(
+  Macro = as.formula(formula_macro),
+  Inmunización = as.formula(formula_inmunizacion),
+  Infancia = as.formula(formula_infancia),
+  Propia = as.formula(formula_propia)
+)
 
+comparar_modelos(life_exp, formulas)
+
+```
+
+## Ejercicio 3
+
+Vamos a trabajar con el dataset ‘student-mat’ que contiene datos de desempeño educativo en matemáticas
+de dos escuelas portuguesas. Acá podrán ver la fuente original de los datos para entender que significa cada
+variable: https://archive.ics.uci.edu/dataset/320/student+performance)
+
+
+### 3.1. Cargar los datos e identificar las variables numéricas y las variables categoriales
+
+```{r}
+setwd("c:/Users/Usuario/OneDrive/Documentos/DATOS/labo de datos")
+
+student <- read.csv("student-mat.csv", sep = ";")
+
+```
+
+Variables numéricas:
+  - age
+  - Medu
+  - Fedu
+  - traveltime
+  - studytime
+  - failures
+  - famrel
+  - freetime
+  - goout
+  - Dalc
+  - Walc
+  - health
+  - absences
+  - G3
+  
+Variables categóricas:
+  - school
+  - sex
+  - address
+  - fam_size
+  - Pstatus
+  - Mjob
+  - Fjob
+  - reason
+  - guardian
+  - schoolsup
+  - famsup
+  - paid
+  - activities
+  - nursery
+  - higher
+  - internet
+  - romantic
+  - G1
+  - G2
+  
+### 3.2. Normalizar las variables numéricas
+
+```{r}
+
+student_normalizado <- student %>%
+  select(where(is.numeric)) %>%
+  mutate(across(everything(), scale))
+
+# Seleccionar variables categóricas originales
+student_cat <- student %>% 
+  select(where(~!is.numeric(.)))
+
+# Combinar normalizadas + categóricas
+student_final <- bind_cols(student_normalizado, student_cat)
+```
+
+
+### 3.3. Implementar una matríz de correlación con las variables numéricas.
+
+```{r}
+matriz <- scale(student_normalizado)
+```
 
