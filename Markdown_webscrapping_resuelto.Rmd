@@ -1,0 +1,449 @@
+---
+title: "Webscrapping"
+output: pdf_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(rvest)
+library(dplyr)
+library(httr2)
+library(ggplot2)
+
+```
+
+El **web scraping** es una técnica utilizada para extraer información de páginas web. Para acceder a una página web desde R se suele utilizar el paquete `rvest` el cual nos permite hacer una solicitud (request) al servidor deseado mediante la función `read_html()`
+
+## Scrappeando tablas
+
+Un uso actual del webscrapping muy común es lo que tiene que ver conlos *football analytics*. Supongamos que nos interesa explorar la página <https://fbref.com/> para ver cómo quedó la tabla de la Primera División Argentina.
+
+Primero, creamos un objeto con toda la info de la tabla. Es decir, extraemos el html
+
+```{r}
+
+url <- "https://fbref.com/es/comps/21/Estadisticas-de-Liga-Profesional-Argentina"
+
+pagina_fbref <- read_html(url)
+
+pagina_fbref
+
+```
+
+`rvest` tiene la función `html_table` que nos permite extraer tablas de cualquier página web. Veamos que nos devuelve
+
+```{r}
+
+tablas_1_div <- html_table(pagina_fbref)
+
+tablas_1_div
+```
+
+Como vemos, tablas_1_div es un elemento de tipo *Large list* que contiene todas las tablas que estan en esa url. Vamos a utilizar la primera tabla que contiene las posiciones. ¿Cómo podrían extraerla?
+
+```{r }
+tabla_liga = tablas_1_div[[1]]
+tabla_liga
+```
+
+Usando distintos índices en nuestro "data" podemos acceder a otras tablas con otros datos. Exploren un rato a ver qué encuentran. ¿Qué problemas encuentran en los datos y en las tablas?
+
+A mi me intereso la tabla data[[2]] que contiene información desagregada por partidos visitantes y de local.
+
+```{r}
+tabla_localia = as.data.frame(tablas_1_div[2])
+tabla_localia
+```
+
+Como vemos, la primera fila también tiene información de headers asi que vamos a tener que modificarlo.
+
+```{r}
+
+
+colnames(tabla_localia) <- paste(tabla_localia[1,], colnames(tabla_localia), sep = "_") # Creamos un nuevo colnames(tabla_localia) que combine  los colnames actuales con la primera fila
+
+tabla_localia <- tabla_localia[-1,]                                     #eliminamos la primera fila
+tabla_localia
+
+```
+
+#### Para quedar arriba de la tabla qué es más importante? ¿Ganar de visitante o de local?
+
+```{r}
+datos_localia = tabla_localia %>% 
+  mutate(Puntos = as.numeric(Pts_Local.7) + as.numeric(Pts_Visitante.7)) %>% 
+  mutate(Ganados_local = as.numeric(PG_Local.1),
+         Ganados_visitante = as.numeric(PG_Visitante.1)) 
+```
+
+```{r}
+
+
+modelo_local <- summary(lm(Puntos ~ Ganados_local, data = datos_localia))$r.squared
+
+modelo_visitante <- summary(lm(Puntos ~ Ganados_visitante, data = datos_localia))$r.squared
+
+modelo_local
+
+modelo_visitante
+
+```
+
+El modelo local tiene un R2 más grande, por lo que pareciera ser que ganar de local explicaría mejor el desempeño general del equipo.
+
+
+
+## Analizando requests
+
+**httr2** es una librería que permite enviar solicitudes a través del protocolo HTTPS.
+
+El comando **get()** es el que vamos a usar para traer la información de una página. Cada vez que ejecutamos el comando get estamos enviando una consulta al servidor. Hay que ser responsables en el uso de las consultas ya que si se ejecutan demasiadas pueden generar problemas en el servidor o incluso pueden bloquear nuestra IP por uso indebido.
+
+En este caso, vamos a tratar de sacar los titulares de Pagina12.
+
+```{r}
+
+
+p12 = request("https://www.pagina12.com.ar/")
+
+req_perform(p12)
+
+```
+
+Acá podemos chequear las distintas posibilidades de status. Nos tocó 200 así que funcionó!
+
+![](status_codes.png)
+
+Para poder leer bien lo que hay adentro de nuestro request, vamos a usar la función read_html() de {rvest} que nos devuelve la información del html en un formato facil de explorar con R (y en formato tidy!)
+
+Si vemos lo que hay adentro, vamos a entender poco.
+
+```{r}
+
+
+pagina12 <- read_html("https://www.pagina12.com.ar/")
+
+pagina12
+
+```
+
+![](htmltags.png)
+
+Un poco lo mismo que encontraremos si inspeccionamos la página con Chrome
+
+![](pagina12.png)
+
+Lo que nos va a interesar es poder hacer *crawling* dentro del html hasta encontrar las etiquetas que contengan la información que queremos.
+
+Para identificar los titulares de Pagina12 deberíamos buscar las etiquetas "h2" mediante html_elements()
+
+```{r}
+elementos_h2 <- html_elements(pagina12,"h2") 
+elementos_h2
+```
+
+Con html_text() extraemos el texto de cada elemento
+
+```{r}
+html_text(elementos_h2)
+```
+
+Todo esto lo podríamos haber hecho más sencillo con unos buenos pipes! Incluso, pasandolo a un dataframe
+
+```{r}
+
+titulares_p12 <- read_html("https://www.pagina12.com.ar/") %>% 
+  html_elements("h2") %>% 
+  html_text() %>% 
+  as.data.frame()
+
+titulares_p12
+```
+
+## Uso de APIs
+
+Una API (Application Programming Interface) define una sintaxis estandarizada que permite la comunicación entre nosotros (clientes) y un determinado servidor.
+
+Generalmente, cada API tiene sus instrucciones que describen la forma de comunicarnos con sus **endpoints** para extraer la información requerida a partir de una URL
+
+![Figura extraida del curso de Gustavo Juantorena <https://www.youtube.com/watch?v=yKi9-BfbfzQ&ab_channel=freeCodeCampEspa%C3%B1ol> Mirenlo!](endpoints.png)
+
+Usualmente, la respuesta de una API llega en formato *JSON*, que es un formato bastante distinto a los csv que venimos manejando.
+
+![Fuente: <https://www.youtube.com/watch?v=yKi9-BfbfzQ&ab_channel=freeCodeCampEspa%C3%B1ol>](jsons.png)
+
+## API Transporte BA - ECO BICIS
+
+El gobierno de la Ciudad de Buenos Aires tiene una API mas o menos piola para levantar datos sobre colectivos, subtes, trenes y bicis en el ámbito de la Ciudad <https://api-transporte.buenosaires.gob.ar/>
+
+![](API_transporte.png)\
+
+Para poder acceder a este tipo de APIs, es común tener que registrarse para obtener algún tipo de credencial. Se pueden registrar acá: <https://api-transporte.buenosaires.gob.ar/registro>
+
+Ahora si, vamos a probar descargar la información sobre las estaciones de eco bici de Buenos Aires
+
+```{r}
+
+link_api='https://apitransporte.buenosaires.gob.ar/ecobici/gbfs/stationInformation?'
+# response = request(link_api)
+# response %>% 
+#   req_perform()
+
+
+```
+
+Estamos desautorizados (?) porque no pusimos las credenciales. Para hacerlo, tenemos que incluir las mismas dentro del parámetro **params**
+
+
+```{r}
+response <- request(link_api) |> 
+  req_url_query(client_id = "f3429f52737b4e019607007f7454602f",
+               client_secret= "E09120C8BC17468fBd98Bd7F37173674")%>% 
+  req_perform()
+```
+
+```{r}
+
+
+credenciales <- list(
+  client_id = "f3429f52737b4e019607007f7454602f",
+  client_secret = "E09120C8BC17468fBd98Bd7F37173674"
+)
+
+response <- request(link_api) %>% 
+  req_url_query(!!!credenciales) %>% 
+  req_perform()
+
+
+```
+
+La vieja usanza:
+
+```{r}
+library(httr)
+
+credenciales <- list(
+  client_id = "f3429f52737b4e019607007f7454602f",
+  client_secret = "E09120C8BC17468fBd98Bd7F37173674"
+)
+
+response <- GET(link_api, query = credenciales)
+
+status_code(response)
+
+```
+
+Para poder abrirlo, vamos a tener que usar **json()** y veremos la estructura de los datos.
+
+```{r}
+
+library(jsonlite)
+
+response <- request(link_api) |> 
+  req_url_query(client_id = "f3429f52737b4e019607007f7454602f",
+               client_secret= "E09120C8BC17468fBd98Bd7F37173674")%>% 
+  req_perform()
+
+estaciones_info = response %>%
+  resp_body_json(simplifyVector = T)
+ 
+estaciones_info_df <-as.data.frame(estaciones_info$data$stations)
+
+```
+
+Como ya es costumbre, lxs invito a chusmear los datos y limpiarlos un poco. Nos va a interesar quedarnos con el ID, la dirección, la capacidad, el código postal, el barrio, latitud y longitud de la estacion
+
+```{r}
+
+estaciones_info_df = estaciones_info_df %>% 
+  select(station_id, name, address, capacity, groups, lat, lon) 
+
+```
+
+## Vamos a trabajar con algunas preguntas concretas:
+
+1.  ¿Cuál es el barrio con más estaciones?
+2.  ¿Cuál es el barrio con más capacidad en promedio?
+3.  ¿Hay una relación entre la cantidad de estaciones y la capacidad?
+
+1 ¿Cuál es el barrio con más estaciones? La variable "groups" es una lista, asi que vamos a tener que desarmarla con as.character()
+
+```{r}
+estaciones_info_df = estaciones_info_df %>% 
+  mutate(groups = as.character(groups))
+
+
+estaciones_info_df %>% 
+  group_by(groups) %>% 
+  summarise(cant_estaciones = n()) %>% 
+  arrange(desc(cant_estaciones))
+```
+
+2.  ¿Cuál es el barrio con más capacidad en promedio?
+
+```{r}
+estaciones_info_df %>% 
+  group_by(groups) %>% 
+  summarise(capacidad_barrio = mean(capacity)) %>% 
+  arrange(desc(capacidad_barrio))
+```
+
+3.  ¿Hay una relación entre la cantidad de estaciones y la capacidad?
+
+```{r}
+
+estaciones_info_barrio <- estaciones_info_df %>% 
+  group_by(groups) %>% 
+  summarise(cant_estaciones = n(),
+            capacidad_barrio = mean(capacity)) 
+
+m1 = lm(cant_estaciones ~ capacidad_barrio, data = estaciones_info_barrio) 
+
+m1_summary = summary(m1)
+
+estaciones_info_barrio %>% 
+  ggplot(aes(x =capacidad_barrio, y = cant_estaciones))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  annotate("text",label = paste("R² = ", round(m1_summary$r.squared, digits = 2)),
+                x = 27, y = 40, size = 6)+
+  theme_minimal()
+
+
+
+```
+
+## Vamos a analizar la información actual (tiempo real) de las estaciones
+
+Algo lindo sería analizar si hay estaciones o barrios que les vendría bien tener más bicis. Para eso, vamos a tener que ir al endpoint <https://apitransporte.buenosaires.gob.ar/ecobici/gbfs/stationStatus>?
+
+Vamos a responder las siguientes preguntas:
+
+1.  ¿Cómo calcularías la disponibilidad de bicis de una estación? Es decir, ¿Cuán usada es una estación?
+
+2.  ¿Las estaciones con más capacidad son las más usadas?
+
+3.  ¿Cómo podríamos identificar barrios con estaciones que sean poco usadas?
+
+Dejo por acá algunas pistas para ir respondiendo.
+
+```{r}
+
+link_api='https://apitransporte.buenosaires.gob.ar/ecobici/gbfs/stationStatus?'
+
+
+estaciones_estado <- request(link_api) |> 
+  req_url_query(client_id = "f3429f52737b4e019607007f7454602f",
+               client_secret= "E09120C8BC17468fBd98Bd7F37173674")%>% 
+  req_perform()
+```
+
+```{r}
+estaciones_estado_json = estaciones_estado %>% 
+  resp_body_json(simplifyVector = T)
+
+estaciones_estado_df <- estaciones_estado_json$data$stations
+# %>% 
+  # as.data.frame()
+```
+
+Una posibilidad es calcular la **capacidad actual** como la suma entre las bicis disponibles y los docs disponibles La **disponibilidad** a mi se me ocurrió calcularla como la cantidad de bicis disponibles dividido por la capacidad actual
+
+```{r}
+
+estaciones_estado_df =  estaciones_estado_df %>% 
+  mutate(capacidad_actual = num_bikes_available + num_docks_available,
+         disponibilidad = num_bikes_available / capacidad_actual) 
+```
+
+```{r}
+
+
+m1 = lm(disponibilidad ~ num_bikes_disabled, data = estaciones_estado_df) 
+
+m1_summary = summary(m1)
+
+
+estaciones_estado_df %>% 
+  ggplot(aes(x =num_bikes_disabled, y = disponibilidad))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  # annotate("text",label = paste("R² = ", round(m1_summary$r.squared, digits = 2)),
+  #               x = 45, y = 0.9, size = 6)+
+  theme_minimal()
+
+
+```
+
+```{r}
+
+
+estaciones_info_df %>% 
+  left_join(estaciones_estado_df, by = "station_id") %>% 
+  group_by(groups) %>% 
+  mutate(cant_estaciones = n(),
+        capacidad_barrio = mean(capacity),
+        disponibilidad_barrio = mean(disponibilidad, na.rm = T)) %>% 
+  ggplot(aes(x = lat, y = lon, color = disponibilidad_barrio))+
+  geom_point(size = 3)+
+  theme_minimal()
+
+
+
+
+```
+
+Una cosa importante para comentar es que las apis son básicamente páginas web que reciben parámetros. No es necesario tener programas especiales ni nada raro para conectarse
+
+Por ejemplo, para acceder a los datos de la información de estaciones de eco bici, podríamos entrar en esta web: <https://apitransporte.buenosaires.gob.ar/ecobici/gbfs/stationInformation?client_id=f3429f52737b4e019607007f7454602f&client_secret=E09120C8BC17468fBd98Bd7F37173674> que tiene el cliente y el secret metido en el medio.
+
+Sin embargo, acceder mediante código es clave cuando queremos volver más reproducible o automatizable el flujo de trabajo. Por ejemplo, este repo actualiza cada una hora la info de las estaciones de ecobici de ciudad universitaria <https://github.com/FedeGiovannetti/Eco_bici_Ciudad_Universitaria>
+
+Si alguien quiere sumarse a hacer algo con esta idea super simple (por ej, poner a disposición algun dashboard con info de las estaciones de Ciudad Universitaria) me avisan [giovannettipsi\@gmail.com](mailto:giovannettipsi@gmail.com){.email}
+
+### ¿Qué días se usa más la bici?
+
+```{r}
+
+eco_bici_ciudad = read.csv("https://raw.githubusercontent.com/FedeGiovannetti/Eco_bici_Ciudad_Universitaria/refs/heads/main/data/full_data.csv")
+
+
+eco_bici_ciudad %>% 
+  mutate(dia = factor(dia, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))) %>% 
+  group_by(dia) %>% 
+  summarise(media_bicis_disponibles = mean(num_bikes_available)) %>% 
+  
+  ggplot(aes(x = dia, y = media_bicis_disponibles)) +
+  geom_col()
+
+
+
+
+
+
+```
+
+### ¿Cómo cambia la disponibilidad a lo largo del día?
+
+```{r}
+library(hms)
+library(lubridate)
+
+eco_bici_ciudad %>% 
+
+  mutate(hora = hour(as_hms(hora))) %>% 
+  group_by(hora) %>% 
+  summarise(media_bicis_disponibles = mean(num_bikes_available)) %>% 
+  
+  ggplot(aes(x = hora, y = media_bicis_disponibles)) +
+  geom_col()+
+  theme_minimal()+
+  scale_x_continuous(breaks = c(0:23))
+
+
+```
