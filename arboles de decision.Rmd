@@ -1,0 +1,138 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-06-03"
+---
+
+Clasificación
+Cargamos los datos
+
+Utilizaremos el conjunto de datos Carseats del paquete ISLR. Necesitamos crear una variable de respuesta binaria. Crearemos HighSales, que será “Yes” si Sales > 8 y “No” en caso contrario.
+
+```{r}
+library(tree)
+library(MASS)
+library(ISLR)
+```
+
+```{r}
+set.seed(1)
+```
+
+```{r}
+data(Carseats) # Carga el dataset Carseats
+carseats_df <- as.data.frame(Carseats) # Convierte a data frame
+
+# Crea la variable de respuesta binaria
+carseats_df$HighSales <- ifelse(carseats_df$Sales > 8, "Yes", "No")
+carseats_df$HighSales <- as.factor(carseats_df$HighSales) # Convierte a factor
+
+# Elimina la variable original 'Sales'
+carseats_df$Sales <- NULL
+
+head(carseats_df)
+
+```
+
+```{r}
+table(carseats_df$HighSales) # Muestra la distribución de clases
+```
+Crear conjuntos de train y test
+
+```{r}
+train_indices_carseats <- sample(1:nrow(carseats_df), nrow(carseats_df) / 2) # Índices para entrenamiento
+carseats_train <- carseats_df[train_indices_carseats, ] # Conjunto de entrenamiento
+carseats_test <- carseats_df[-train_indices_carseats, ] # Conjunto de prueba
+
+print(paste("Tamaño del conjunto de entrenamiento de Carseats:", nrow(carseats_train)))
+print(paste("Tamaño del conjunto de prueba de Carseats:", nrow(carseats_test)))
+```
+Entrenamos el árbol de clasificación
+
+Ajustamos el árbol de clasificación usando tree(). Como HighSales es un factor, la función tree() automáticamente construye un árbol de clasificación. La fórmula HighSales ~ . indica predecir HighSales usando todas las demás variables
+
+```{r}
+carseats_tree_fit <- tree(HighSales ~ ., data = carseats_train)
+```
+
+Mostramos resultados y graficamos
+
+Usamos summary() para obtener un resumen y plot() con text() para visualizar el árbol de clasificación
+
+```{r}
+summary(carseats_tree_fit) # Resumen del árbol
+```
+
+```{r}
+plot(carseats_tree_fit) # Dibuja la estructura del árbol
+text(carseats_tree_fit, pretty = 0, cex = 0.7) # Añade etiquetas
+title("Árbol de Clasificación para Datos de Carseats (Sin Podar)")
+```
+Validación cruzada para la poda
+
+Para árboles de clasificación, cv.tree() puede usar la tasa de error de clasificación como criterio. Especificamos FUN = prune.misclass para esto. Buscamos el tamaño que minimice este error de CV.
+
+```{r}
+cv_carseats_tree <- cv.tree(carseats_tree_fit, FUN = prune.misclass) # CV usando error de clasificación
+cv_carseats_tree
+```
+
+```{r}
+# Grafica el error de clasificación vs. el tamaño del árbol
+plot(cv_carseats_tree$size, cv_carseats_tree$dev, type = "b",
+     xlab = "Tamaño del Árbol (Nº Nodos Terminales)", ylab = "Error de Clasificación CV")
+title("Error de Clasificación CV vs. Tamaño del Árbol (Carseats)")
+
+# Identifica el tamaño con el mínimo error de clasificación CV
+optimal_size_carseats <- cv_carseats_tree$size[which.min(cv_carseats_tree$dev)]
+print(paste("Tamaño óptimo del árbol según CV (error de clasificación):", optimal_size_carseats))
+points(optimal_size_carseats, min(cv_carseats_tree$dev), col = "red", cex = 2, pch = 20)
+```
+
+Podar el árbol de clasificación
+Podamos el árbol de clasificación usando prune.misclass() con el tamaño best (óptimo) encontrado mediante CV.
+
+```{r}
+carseats_tree_pruned <- prune.misclass(carseats_tree_fit, best = optimal_size_carseats) # Poda el árbol
+
+# Grafica el árbol podado
+plot(carseats_tree_pruned)
+text(carseats_tree_pruned, pretty = 0, cex = 0.8)
+title(paste("Árbol de Clasificación Podado (Tamaño =", optimal_size_carseats, ")"))
+```
+```{r}
+summary(carseats_tree_pruned) # Resumen del árbol podado
+```
+Evaluar el árbol podado en el conjunto de prueba
+
+Predecimos las etiquetas de clase en el conjunto de prueba (carseats_test) usando type = "class". Luego, calculamos la matriz de confusión y la tasa de error de clasificación para evaluar el rendimiento del árbol podado. Comparamos con el árbol sin podar
+
+```{r}
+# Predicciones con el árbol podado
+pred_carseats_test_class <- predict(carseats_tree_pruned, newdata = carseats_test, type = "class")
+actual_carseats_test_class <- carseats_test$HighSales # Clases reales
+
+# Matriz de Confusión
+confusion_matrix_carseats <- table(Predicted = pred_carseats_test_class, Actual = actual_carseats_test_class)
+print("Matriz de Confusión (Árbol Podado) - Conjunto de Prueba Carseats:")
+print(confusion_matrix_carseats)
+```
+
+```{r}
+# Tasa de Error de Clasificación (Misclassification Rate)
+misclass_rate_carseats <- 1 - sum(diag(confusion_matrix_carseats)) / sum(confusion_matrix_carseats)
+print(paste("Tasa de error de clasificación en prueba (árbol podado):", round(misclass_rate_carseats, 4)))
+```
+```{r}
+# Para comparar, evaluación del árbol sin podar en el conjunto de prueba
+
+pred_carseats_unpruned_test_class <- predict(carseats_tree_fit, newdata = carseats_test, type = "class")
+confusion_matrix_unpruned_carseats <- table(Predicted = pred_carseats_unpruned_test_class, Actual = actual_carseats_test_class)
+
+misclass_rate_unpruned_carseats <- 1 - sum(diag(confusion_matrix_unpruned_carseats)) / sum(confusion_matrix_unpruned_carseats)
+print(paste("Tasa de error de clasificación en prueba (árbol sin podar):", round(misclass_rate_unpruned_carseats, 4)))
+
+print("Matriz de Confusión (Árbol Sin Podar) - Conjunto de Prueba Carseats:")
+print(confusion_matrix_unpruned_carseats)
+```
+

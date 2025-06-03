@@ -27,7 +27,7 @@ Verificar los tipos de variables
 La variable Class debe estar como factor, si no lo está, convertirla.
 
 ```{r}
-setwd("c:/Users/Usuario/OneDrive/Documentos/DATOS/labo de datos")
+setwd("/home/Estudiante/Documentos")
 
 datos <- read.csv("datosTP.csv")
 ```
@@ -165,9 +165,17 @@ La variable Class contiene los diagnósticos verdaderos, mientras que .pred_clas
 Evaluación del desempeño
 
 ```{r}
-datos_test_predictions %>% 
-  metrics(truth = Class, estimate = .pred_class) %>% 
-  filter(.metric == "accuracy")
+# Asegurarse de que ambas columnas sean factores con los mismos niveles
+datos_test_predictions <- datos_test_predictions %>%
+  mutate(
+    Class = factor(Class),
+    .pred_class = factor(.pred_class, levels = levels(Class))
+  )
+
+# Calcular solo la métrica de accuracy
+accuracy_metric <- metric_set(accuracy)
+
+accuracy_metric(datos_test_predictions, truth = Class, estimate = .pred_class)
 ```
 
 Matriz de confusion
@@ -178,4 +186,17 @@ confusion <- datos_test_predictions %>%
 confusion
 ```
 
-- Calcular las métricas de desempeño vistas en clase
+- Calcular las métricas de desempeño vistas en clase (falta precision y recall)
+
+precision = número de correctos clasificados positivos/número total de predicciones positivas
+
+```{r}
+precision(data = datos_test_predictions, truth = Class, estimate = .pred_class)
+```
+recall = número de correctos clasificados positivos/numero total de positivos en el set
+
+```{r}
+recall(data = datos_test_predictions, truth = Class, estimate = .pred_class)
+```
+
+
