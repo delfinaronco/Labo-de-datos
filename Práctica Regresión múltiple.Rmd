@@ -271,6 +271,16 @@ student_final <- bind_cols(student_normalizado, student_cat)
 ### 3.3. Implementar una matríz de correlación con las variables numéricas.
 
 ```{r}
-matriz <- scale(student_normalizado)
+library(corrplot)
+
+datos_numericos <- student %>%
+  select(where(is.numeric))
+
+# Calcular la matriz de correlación
+matriz_cor <- cor(datos_numericos, use = "complete.obs")
+
+# Visualizar la matriz de correlación
+corrplot(matriz_cor, method = "color", tl.cex = 0.8)
 ```
 
+### 3.4. Realizar una selección de variables buscando evitar la futura construcción de modelos con variables altamente correlacionadas.
