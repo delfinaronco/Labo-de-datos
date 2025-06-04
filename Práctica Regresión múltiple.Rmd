@@ -86,7 +86,7 @@ Nos interesa testear cuatro posibles modelos explicativos:
 ### 2.1. Correr cada uno de los modelos.
 
 ```{r}
-setwd("c:/Users/Usuario/OneDrive/Documentos/DATOS/labo de datos")
+# setwd("c:/Users/Usuario/OneDrive/Documentos/DATOS/labo de datos")
 
 life_exp <- read.csv("Life_Expectancy_2015.csv")
 
@@ -208,7 +208,7 @@ variable: https://archive.ics.uci.edu/dataset/320/student+performance)
 ### 3.1. Cargar los datos e identificar las variables numéricas y las variables categoriales
 
 ```{r}
-setwd("c:/Users/Usuario/OneDrive/Documentos/DATOS/labo de datos")
+# setwd("c:/Users/Usuario/OneDrive/Documentos/DATOS/labo de datos")
 
 student <- read.csv("student-mat.csv", sep = ";")
 
@@ -284,3 +284,104 @@ corrplot(matriz_cor, method = "color", tl.cex = 0.8)
 ```
 
 ### 3.4. Realizar una selección de variables buscando evitar la futura construcción de modelos con variables altamente correlacionadas.
+
+```{r}
+library(caret)
+# Para encontrar pares de variables con alta correlación:
+high_cor <- findCorrelation(matriz_cor, cutoff = 0.8)  # requiere el paquete caret
+data_reduced <- datos_numericos[, -high_cor]
+high_cor 
+head(data_reduced)
+```
+
+Estas tres variables (G1, G2, G3) están fuertemente relacionadas entre sí porque representan notas parciales y finales del estudiante. Por lo tanto:
+
+No conviene incluirlas todas juntas en un mismo modelo, ya que generarían multicolinealidad.
+¿Qué podés hacer en el punto 3.4?
+
+Podés decidir quedarte solo con una de ellas (por ejemplo, G3 que es la nota final), o bien hacer pruebas más adelante con modelos alternativos que usen solo una entre G1, G2 y G3.
+
+### 3.5. A partir de lo visto en la matriz de correlación, proponer conceptualmente tres modelos distintos con entre 4 y 5 variables numéricas y al menos 1 variable categórica cada uno (sin correr los modelos
+
+#### Modelo 1: Modelo socioeconómico
+
+Objetivo: Evaluar cómo influyen las condiciones familiares y sociales en el rendimiento.
+
+Variables numéricas:
+
+    studytime: tiempo dedicado al estudio semanal
+
+    failures: cantidad de materias reprobadas
+
+    absences: cantidad de inasistencias
+
+    famrel: calidad de relación familiar
+
+Variable categórica:
+
+    Medu: nivel educativo de la madre (convertido a factor)
+    
+#### Modelo 2: Modelo de salud y estilo de vida
+
+Objetivo: Evaluar si hábitos personales y salud mental se relacionan con el rendimiento.
+
+Variables numéricas:
+
+    absences: cantidad de inasistencias
+
+    goout: frecuencia con que sale con amigos
+
+    health: estado de salud autoevaluado
+
+    freetime: tiempo libre después de la escuela
+
+Variable categórica:
+
+    sex: género del estudiante
+    
+#### Modelo 3: Modelo académico
+
+Objetivo: Centrarse en factores directamente relacionados con el estudio y el rendimiento previo.
+
+Variables numéricas:
+
+    studytime: tiempo dedicado al estudio
+
+    failures: materias reprobadas
+
+    G1: nota del primer período (o G2, evitar ambas juntas por alta correlación)
+
+    absences: ausencias
+
+Variable categórica:
+
+    schoolsup: si recibe apoyo escolar adicional (yes/no)
+
+### 3.6. Implementar todos los modelos a partir de la función generada en el ejercicio 2.4
+
+```{r}
+formulas_student <- list(
+  Socioeconómico = G3 ~ studytime + failures + absences + famrel + as.factor(Medu),
+  Salud = G3 ~ absences + goout + health + freetime + sex,
+  Académico = G3 ~ studytime + failures + G1 + absences + schoolsup)
+
+
+comparar_modelos(student_final, formulas_student)
+```
+El mejor modelo es el académico
+
+### 3.7. Seleccionar el mejor modelo y volvelo a correr para inspeccionar sus coeficientes
+
+```{r}
+glm_academico <- glm(G3 ~ studytime + failures + G1 + absences + schoolsup, data = student_final)
+MSE_academico <- cv.glm(student_final, glm_academico)$delta[1]
+lm_academico <- lm(G3 ~ studytime + failures + G1 + absences + schoolsup, data = student_final)
+r2_academico <- summary(lm_academico)$r.squared
+
+lm_academico
+MSE_academico
+r2_academico
+
+```
+
+### 3.8. Escribí la función resultante del modelo.
