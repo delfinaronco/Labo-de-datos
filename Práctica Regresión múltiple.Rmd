@@ -385,3 +385,36 @@ r2_academico
 ```
 
 ### 3.8. Escribí la función resultante del modelo.
+
+G3 = -0.03349 - 0.04528 * studytime - 0.08917 * failures + 0.79748 * G1 + 0.05985 * absences + 0.25937 * schoolsupYes
+
+(donde schoolsupYes = 1 si el/la estudiante recibe apoyo escolar adicional (schoolsup == "yes"), y 0 en caso contrario.)
+
+
+### 3.9. Explica cuales son las variables con más peso en el modelo, el sentido de las mismas y ensayá una explicación conceptual del modelo.
+
+| Variable       | Coeficiente  | Interpretación breve                                                                                |
+| -------------- | ------------ | --------------------------------------------------------------------------------------------------- |
+| (Intercepto)   | -0.03349     | Valor base (sin variables)                                                                          |
+| `G1`           | **+0.79748** | Gran influencia positiva: una nota más alta en el primer trimestre predice una nota final más alta. |
+| `schoolsupYes` | +0.25937     | Recibir apoyo escolar extra se asocia con mejores notas finales.                                    |
+| `absences`     | +0.05985     | Ligeramente positivo, aunque podría ser contraintuitivo.                                            |
+| `studytime`    | -0.04528     | Leve efecto negativo (sorprendente).                                                                |
+| `failures`     | -0.08917     | Repetir materias afecta negativamente el rendimiento final.                                         |
+
+El modelo predice la nota final (G3) a partir de:
+
+El rendimiento previo (G1) tiene el mayor peso, lo cual es esperable: quien empieza bien suele terminar bien.
+
+El apoyo escolar adicional (schoolsup == "yes") mejora el desempeño, lo que sugiere que las intervenciones escolares pueden ser efectivas.
+
+Llamativamente, el tiempo dedicado al estudio (studytime) tiene un coeficiente levemente negativo, lo cual podría deberse a que los estudiantes que necesitan estudiar más lo hacen porque tienen más dificultades.
+
+El número de materias reprobadas (failures) reduce el rendimiento final, lo que confirma que hay una trayectoria escolar acumulativa.
+
+Las inasistencias (absences) tienen un efecto positivo leve, lo cual puede ser ruido o reflejar que algunos estudiantes faltan sin afectar su rendimiento (por ejemplo, por actividades extracurriculares).
+
+Conclusión conceptual:
+El modelo refleja que el rendimiento escolar previo (G1) es el predictor más fuerte del rendimiento futuro, lo cual es lógico. También destaca que el apoyo escolar externo tiene un impacto positivo, lo que sugiere que políticas de refuerzo pueden ser útiles. Algunas relaciones (como el efecto negativo de studytime) invitan a pensar que no siempre estudiar más implica mejores resultados, posiblemente porque está correlacionado con dificultades previas.
+
+
