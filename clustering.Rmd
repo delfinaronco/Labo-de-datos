@@ -1,0 +1,116 @@
+---
+title: "clustering"
+author: "delfina"
+date: "2025-06-06"
+output: html_document
+---
+### Ejercicio 1 - Contaminación del agua en la cuenca Matanza-Riachuelo
+
+Objetivo: Formar 3 grupos de estaciones de monitoreo ambiental en función de sus características de contaminación, para asignar tres equipos de trabajo que se encarguen de su gestión y planificación.
+
+```{r}
+setwd("/home/Estudiante/Documentos")
+
+Datos <- read.csv("DatosMetales_mod.csv")
+```
+
+```{r}
+library(GGally)
+library(cluster)
+library(factoextra)
+```
+
+```{r}
+names(Datos)
+str(Datos)
+summary(Datos)
+```
+- Explorar los datos
+
+```{r}
+head(Datos)
+ggpairs(Datos[, -1])
+```
+
+- Si considera que corresponde, estandarizar los datos
+
+```{r}
+Datosz <- as.data.frame(scale(Datos[,-(1)]))
+```
+
+- Calcular la Matriz de distancia
+
+```{r}
+dist.eucl <- dist(Datosz, method = "euclidean")
+dist.eucl
+```
+Visualizar la matriz de distancias, para algunos sitios
+
+```{r}
+round(as.matrix(dist.eucl)[1:5, 1:5], 2)
+```
+
+- Visualizacion de matriz de distancia
+
+```{r}
+fviz_dist(dist.eucl)
+```
+
+Mejoremos el grafico
+
+```{r}
+gdist <- fviz_dist(dist.eucl) +
+  labs(
+    title = "Matriz de Distancias Euclidianas",
+    x = "Observaciones",
+    y = "Observaciones"
+  ) +
+  theme(
+    axis.text.x = element_text(size = 14, angle = 90),
+    axis.text.y = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+  )
+
+gdist 
+```
+- Implementacion de K-means
+
+```{r}
+set.seed(25)
+
+kmeans_res <- kmeans(Datosz, 3, nstart = 25)  
+kmeans_res
+```
+Visualización
+
+```{r}
+g3 <- fviz_cluster(kmeans_res, data = Datosz, 
+             ellipse.type = "euclid",
+             palette = "jco",
+             ggtheme = theme_minimal())
+g3
+```
+- Silhouette
+
+```{r}
+# - Silhouette
+ss <- silhouette(kmeans_res$cluster, dist(Datosz))
+
+mean(ss[,3])
+summary(ss[,3])
+```
+
+- Caracterizar los grupos conformados en relación a: 1) la contaminación por metales y 2) las características fisicoquímicas
+
+- Método del codo (elbow method) para elegir el número óptimo de clusters
+
+```{r}
+fviz_nbclust(Datosz, kmeans, method = "wss", k.max = 10) +
+  labs(
+    title = "",
+    x = "Número de clústeres (k)",
+    y = "Suma de cuadrados intra-clúster (WSS)"
+  ) +
+  theme_minimal()
+```
+
