@@ -191,12 +191,12 @@ confusion
 precision = número de correctos clasificados positivos/número total de predicciones positivas
 
 ```{r}
-precision(data = datos_test_predictions, truth = Class, estimate = .pred_class)
+precision(data = datos_test_predictions, truth = Class, estimate = .pred_class, event_level = "second")
 ```
 recall = número de correctos clasificados positivos/numero total de positivos en el set
 
 ```{r}
-recall(data = datos_test_predictions, truth = Class, estimate = .pred_class)
+recall(data = datos_test_predictions, truth = Class, estimate = .pred_class, event_level = "second")
 ```
 
 
