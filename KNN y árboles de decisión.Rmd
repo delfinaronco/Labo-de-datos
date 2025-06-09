@@ -1,0 +1,481 @@
+---
+title: "KNN"
+output: html_document
+date: "2025-06-02"
+---
+
+## Ejercicio 1
+
+Este ejercicio está basado en un caso de estudio presentado en el libro Data Science A First Introduction de Tiffany Timbers, Trevor Campbell y Melissa Lee (capítulo 5), disponible en https://datasciencebook.ca/
+
+Sobre el dataset: Wolberg, W., Mangasarian, O., Street, N., y Street, W. (1993). Breast Cancer Wisconsin (Diagnostic) [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5DW2B.
+
+Por cuestiones practicas para comenzar el ejercicio se ofrece un dataset pre-procesado.
+
+Librerias
+
+```{r}
+library(tidymodels)
+library(kknn)
+library(tidyverse)
+```
+
+Abrir el dataset y explorar
+Recordar las recomendaciones sobre el entorno y el directorio de trabajo
+El dataset se llama datosTP.csv
+Verificar los tipos de variables
+La variable Class debe estar como factor, si no lo está, convertirla.
+
+```{r}
+# setwd("/home/Estudiante/Documentos")
+
+datos <- read.csv("datosTP.csv")
+```
+
+Seleccionar el conjunto de entrenamiento
+
+```{r}
+datos_train <- datos %>% 
+  select(Class, Perimeter, Concavity)
+```
+
+Especificación del modelo
+
+```{r}
+knn_spec <- nearest_neighbor(weight_func = "rectangular", neighbors = 5) %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+```
+
+Ajuste del modelo
+
+```{r}
+datos_train$Class <- as.factor(datos_train$Class)
+
+knn_fit <-  knn_spec %>% 
+  fit(Class ~  Perimeter + Concavity, data = datos_train)
+```
+
+Predicciones
+Nueva observacion: Perimeter = 0, Concavity = 3.5 (estandarizada)
+
+```{r}
+new_obs <- tibble(Perimeter = 0, Concavity = 3.5)
+predict(knn_fit, new_obs)
+```
+
+Evaluacion de desempeño: set de entrenamiento y de testeo
+Exploracion del dataset (total)
+- Abrir el dataset, sin las variables estandarizadas: datos_unscaled.csv
+
+```{r}
+datos_unscaled <- read.csv("datos_unscaled.csv") 
+```
+
+- Explorar el dataset
+
+- Graficar Concavity vs Smoothness, discriminando por Class
+
+```{r}
+ggplot(datos, aes(x = Concavity, y = Smoothness, color = Class)) +
+  geom_point() + scale_color_manual(values = c("Benign" = "forestgreen", "Malignant" = "red")) +
+  labs(title = "Concavity vs Smoothness",
+       y = "Smoothness",
+       x = "Concavity") +
+  theme_minimal()
+```
+
+
+Particion del dataset
+- Fijar una semilla
+
+```{r}
+datos_split <- initial_split(datos_unscaled, prop = 0.75, strata = Class)
+```
+
+Training y Testing sets
+
+```{r}
+datos_train <- training(datos_split)
+datos_test <- testing(datos_split) 
+```
+
+Podemos chequear las proporciones de clases en cada subset
+
+```{r}
+proportionstrain <- datos_train %>% 
+                      group_by(Class) %>% 
+                      summarize(n = n()) %>% 
+                      mutate(percent = 100*n/nrow(datos_train))
+proportionstrain
+```
+
+Pre-procesamiento de datos: “receta” del paquete recetas
+Una receta es una descripción de los pasos que deben aplicarse a un conjunto de datos con el fin de prepararlo para el análisis de datos.
+
+La “receta” comienza especificando que para los datos datos_train, la clase es la respuesta y Smoothness y Concavity se utilizarán como predictoras.
+
+Como KNN es sensible a la escala (de las variables predictoras), las estandarizamos
+
+```{r}
+datos_recipe <- recipe(Class ~ Smoothness + Concavity, 
+                        data = datos_train)  %>% 
+                step_scale(all_predictors()) %>% 
+                step_center(all_predictors())
+```
+
+Entrenamiento del clasificador
+Ahora que hemos dividido nuestro conjunto de datos original en conjuntos de entrenamiento y prueba, podemos crear nuestro clasificador KNN solo con el conjunto de entrenamiento.
+
+Elegimos un numero de vecinos más cercanos (por ahora de manera “arbitraria” elegimos K=3
+). Mas adelante veremos como podemos elegir este numero
+
+Recordemos que usamos Concavity y Smoothness como predictoras (lo especificamos en nuestra “receta”)
+
+```{r}
+knn_spec <- nearest_neighbor(weight_func="rectangular", neighbors = 3) %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+```
+
+workflow example
+
+```{r}
+knn_fit <- workflow() %>%                 # 1. Crea un "pipeline" vacío de modelado
+  add_recipe(datos_recipe) %>%            # 2. Agrega el preprocesamiento (receta)
+  add_model(knn_spec) %>%                 # 3. Agrega el modelo (por ejemplo, KNN)
+  fit(data = datos_train)                 # 4. Ajusta (entrena) el modelo con los datos
+
+knn_fit
+```
+Predicciones
+Ahora que tenemos un clasificador KNN, podemos usarlo para predecir las “etiquetas” de la clase del conjunto de datos de testeo.
+
+```{r}
+datos_test_predictions <- predict(knn_fit, datos_test) %>% 
+  bind_cols(datos_test)
+
+head(datos_test_predictions)
+```
+
+Usamos bind_cols para agregar la columna de predicciones a los datos de prueba originales, creando así el dataframe datos_test_predictions.
+
+La variable Class contiene los diagnósticos verdaderos, mientras que .pred_class contiene los diagnósticos predichos por el clasificador.
+
+Evaluación del desempeño
+
+```{r}
+# Asegurarse de que ambas columnas sean factores con los mismos niveles
+datos_test_predictions <- datos_test_predictions %>%
+  mutate(
+    Class = factor(Class),
+    .pred_class = factor(.pred_class, levels = levels(Class))
+  )
+
+# Calcular solo la métrica de accuracy
+accuracy_metric <- metric_set(accuracy)
+
+accuracy_metric(datos_test_predictions, truth = Class, estimate = .pred_class)
+```
+
+Matriz de confusion
+
+```{r}
+confusion <- datos_test_predictions %>% 
+             conf_mat(truth = Class, estimate = .pred_class)
+confusion
+```
+
+- Calcular las métricas de desempeño vistas en clase (falta precision y recall)
+
+precision = número de correctos clasificados positivos/número total de predicciones positivas
+
+```{r}
+precision(data = datos_test_predictions, truth = Class, estimate = .pred_class, event_level = "second")
+```
+recall = número de correctos clasificados positivos/numero total de positivos en el set
+
+```{r}
+recall(data = datos_test_predictions, truth = Class, estimate = .pred_class, event_level = "second")
+```
+
+## Ejercicio 2
+
+Reproducir los ejemplos presentados en el item 4.7.6 K-Nearest Neighbors del libro An Introduction to Statistical Learning (disponible en https://www.statlearning.com/) En la solapa Resources – R Materials – Chapter 4 .R File tienen el código de R bajo el encabezado # K-Nearest Neighbors
+
+https://www.statlearning.com/resources-first-edition
+
+Estos ejemplos están desarrollados con la función knn de la librería class
+
+```{r}
+library(ISLR)
+library(class)
+
+attach(Weekly)
+
+train <- (Year < 2005)
+
+train.X=cbind(Lag1,Lag2)[train,]
+test.X=cbind(Lag1,Lag2)[!train,]
+train.Direction=Direction[train]
+
+train.Direction <- Direction[train]
+Direction.2005  <- Direction[!train]
+```
+```{r}
+set.seed(1)
+
+knn.pred=knn(train.X,test.X,train.Direction,k=1)
+table(knn.pred,Direction.2005)
+
+(72+99)/313
+```
+```{r}
+knn.pred=knn(train.X,test.X,train.Direction,k=3)
+table(knn.pred,Direction.2005)
+mean(knn.pred==Direction.2005)
+
+```
+Otro ejemplo
+
+```{r}
+library(ISLR2)
+dim(Caravan)  # número de filas y columnas
+```
+
+```{R}
+attach(Caravan)
+summary(Purchase)
+
+348/5822
+```
+Estandarizamos los datos
+
+```{r}
+standardized.X=scale(Caravan[,-86])
+var(Caravan[,1])
+var(Caravan[,2])
+var(standardized.X[,1])
+var(standardized.X[,2])
+```
+We now split the observations into a test set, containing the frst 1,000
+observations, and a training set, containing the remaining observations.
+We ft a KNN model on the training data using K = 1, and evaluate its
+performance on the test data.
+
+```{r}
+test=1:1000
+train.X=standardized.X[-test,]
+test.X=standardized.X[test,]
+train.Y=Purchase[-test]
+test.Y=Purchase[test]
+set.seed(1)
+knn.pred=knn(train.X,test.X,train.Y,k=1)
+```
+
+```{R}
+mean(test.Y!=knn.pred)
+```
+Tasa de error (porcentaje de casos mal clasificados): 11.8%
+
+```{R}
+mean(test.Y!="No")
+```
+Porcentaje de observaciones del conjunto de prueba que son distintas de "No".
+O sea, solo un 5.9% compró
+
+
+```{r}
+table(knn.pred,test.Y)
+9/(68+9)
+
+```
+It turns out that KNN with K = 1 does far better than random guessing
+among the customers that are predicted to buy insurance. Among 77 such
+customers, 9, or 11.7 %, actually do purchase insurance. This is double the
+rate that one would obtain from random guessing.
+
+```{r}
+knn.pred=knn(train.X,test.X,train.Y,k=3)
+table(knn.pred,test.Y)
+5/26
+knn.pred=knn(train.X,test.X,train.Y,k=5)
+table(knn.pred,test.Y)
+4/15
+```
+Using K = 3, the success rate increases to 19 %, and with K = 5 the rate is
+26.7 %. This is over four times the rate that results from random guessing.
+It appears that KNN is fnding some real patterns in a diffcult data set!
+
+
+However, while this strategy is cost-efective, it is worth noting that only
+15 customers are predicted to purchase insurance using KNN with K =
+5. In practice, the insurance company may wish to expend resources on
+convincing more than just 15 potential customers to buy insurance.
+As a comparison, we can also ft a logistic regression model to the data.
+If we use 0.5 as the predicted probability cut-of for the classifer, then
+we have a problem: only seven of the test observations are predicted to
+purchase insurance. Even worse, we are wrong about all of these! However,
+we are not required to use a cut-of of 0.5. If we instead predict a purchase
+any time the predicted probability of purchase exceeds 0.25, we get much
+better results: we predict that 33 people will purchase insurance, and we 
+are correct for about 33 % of these people. This is over fve times better
+than random guessing!
+
+```{r}
+glm.fits=glm(Purchase~., data=Caravan, family=binomial, subset=-test)
+glm.probs=predict(glm.fits,Caravan[test,], type="response")
+
+glm.pred=rep("No",1000)
+glm.pred[glm.probs>.5]="Yes"
+
+table(glm.pred,test.Y)
+glm.pred=rep("No",1000)
+glm.pred[glm.probs>.25]="Yes"
+table(glm.pred,test.Y)
+
+11/(22+11)
+```
+
+## Ejercicio 3
+
+La Pima Indians Diabetes databasees un conjunto de datos cuyo objetivo es predecir si un paciente padece diabetes, basándose en ciertas mediciones diagnósticas incluidas en el conjunto de datos. Se aplicaron varias restricciones a la selección de estos casos de una base de datos más amplia. En particular, todos los pacientes incluidos son mujeres de al menos 21 años de ascendencia indígena Pima.
+
+La base de datos diabetes_mod.csv es a su vez una modificaciòn de esta base (a la cual se le realizó un pre-procesamiento)
+
+Las variable incluidas en el conjunto de datos son:
+
+Variables independientes:
+
+Pregnancies: Number of times pregnant
+Glucose: Plasma glucose concentration a 2 hours in an oral glucose tolerance test
+BloodPressure: Diastolic blood pressure (mm Hg)
+SkinThickness: Triceps skin fold thickness (mm)
+Insulin: 2-Hour serum insulin (mu U/ml)
+BMI: Body mass index (weight in kg/(height in m)^2)
+DiabetesPedigreeFunction: Diabetes pedigree function
+Age: Age (years)
+Variable dependiente (Y):
+
+Outcome: 1 as diabetes detected & 0 as not detected
+
+a) Cargar y explorar el dataset
+
+# no está el dataset
+
+
+## Ejercicio 4
+
+```{r}
+library(rpart)
+library(caret)
+```
+
+
+El dataset arboles.csv contiene información del arbolado urbano de la Ciudad de Buenos Aires, incluyendo registros de cuatro especies: Jacarandá, Ceibo, Pindó y Eucaliptus. Cada árbol está descripto mediante tres atributos: altura total (altura_tot), diámetro (diametro) e inclinación (inclinacio).
+
+El objetivo es construir un árbol de decisión para predecir la especie del árbol (nombre_com) a partir de estos atributos.
+
+a) Cargar y explorar el dataset
+
+```{r}
+arboles <- read.csv("arboles.csv")
+head(arboles)
+summary(arboles)
+str(arboles)
+```
+b) Visualizar la distribución de cada atributo numérico
+
+```{r}
+library(ggplot2)
+library(readr)
+library(tidyr)
+library(dplyr)
+
+# Seleccionar solo las columnas numéricas de interés
+datos_numericos <- arboles %>%
+  select(altura_tot, diametro, inclinacio) %>%
+  pivot_longer(cols = everything(), names_to = "atributo", values_to = "valor")
+
+# Graficar con ggplot2
+ggplot(datos_numericos, aes(x = valor)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "skyblue", color = "black", alpha = 0.7) +
+  geom_density(color = "blue", size = 1) +
+  facet_wrap(~ atributo, scales = "free", nrow = 1) +
+  labs(title = "Distribución de atributos numéricos", x = "Valor", y = "Densidad") +
+  theme_minimal()
+```
+c) Graficar relación entre diámetro y altura, coloreado por especie
+
+```{r}
+ggplot(arboles, aes(x = diametro, y = altura_tot, color = nombre_com)) +
+  geom_point(alpha = 0.7) +
+  labs(
+    title = "Relación entre diámetro y altura por especie",
+    x = "Diámetro",
+    y = "Altura",
+    color = "Especie"
+  ) + theme_minimal()
+```
+
+d) Entrenar un árbol de decisión con diferentes configuraciones
+
+  - Dividir el dataset en entrenamiento (80%) y prueba (20%)
+
+  - Entrenar un árbol de decisión completo con todos los atributos
+
+  - Evaluar la precisión del modelo en datos de prueba
+  
+
+```{r}
+# Dividir en entrenamiento (80%) y prueba (20%)
+
+set.seed(42)
+indices <- createDataPartition(arboles$nombre_com, p = 0.8, list = FALSE)  
+entrenamiento <- arboles[indices, ]
+prueba <- arboles[-indices, ]
+
+print(paste("Tamaño del conjunto de entrenamiento:", nrow(entrenamiento)))
+print(paste("Tamaño del conjunto de prueba:", nrow(prueba)))
+
+# Entrenar árbol de decisión completo
+
+# Asegurarse de que la variable objetivo sea un factor
+arboles$nombre_com <- as.factor(arboles$nombre_com)
+
+# Ajustar el árbol de decisión
+tree_fit <- tree(nombre_com ~ ., data = arboles)
+summary(tree_fit)
+plot(tree_fit)
+text(tree_fit, pretty = 0)
+```
+
+```{R}
+cv_tree <- cv.tree(tree_fit, FUN = prune.tree)
+
+print("Resultados de la validación cruzada:")
+print(cv_tree) # Muestra los resultados (tamaño, devianza, k)
+
+# Grafica la devianza vs. el tamaño del árbol
+plot(cv_tree$size, cv_tree$dev, type = "b",
+     xlab = "Tamaño del Árbol (Nº Nodos Terminales)", ylab = "Devianza CV")
+title("Devianza CV vs. Tamaño del Árbol")
+
+# Identifica el tamaño con la mínima devianza CV
+optimal_size <- cv_tree$size[which.min(cv_tree$dev)]
+print(paste("Tamaño óptimo del árbol según CV:", optimal_size))
+
+# Marca el punto óptimo en el gráfico
+points(optimal_size, min(cv_tree$dev), col = "red", cex = 2, pch = 20)
+```
+
+No hay que podarlo (quedaría igual)
+
+
+
+
+  
+
+
+
+
