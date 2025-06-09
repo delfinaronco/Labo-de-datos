@@ -3,17 +3,121 @@ title: "Untitled"
 output: html_document
 date: "2025-06-03"
 ---
+## Árboles de Decisión
+### Regresión
 
-Clasificación
 Cargamos los datos
-
-Utilizaremos el conjunto de datos Carseats del paquete ISLR. Necesitamos crear una variable de respuesta binaria. Crearemos HighSales, que será “Yes” si Sales > 8 y “No” en caso contrario.
 
 ```{r}
 library(tree)
 library(MASS)
 library(ISLR)
 ```
+
+Usaremos el conjunto de datos Boston del paquete MASS para predecir el valor mediano de las viviendas ocupadas por sus propietarios (medv).
+
+Los paquetes MASS (para los datos de Boston) y tree se cargaron en el bloque de configuración inicial. Aquí, cargamos explícitamente el dataset Boston y lo convertimos a un data frame para facilitar su manejo. Luego, inspeccionamos su estructura y las primeras filas.
+
+```{r}
+data(Boston)
+boston_df <- as.data.frame(Boston)
+head(boston_df)
+```
+Crear conjuntos de train y test
+
+Dividiremos los datos en un conjunto de entrenamiento (usaremos el 50% para este ejemplo, como se hace a menudo en ISLR por simplicidad) y un conjunto de prueba (el 50% restante).
+
+```{r}
+set.seed(1)
+train_indices_boston <- sample(1:nrow(boston_df), nrow(boston_df) / 2)
+
+boston_train <- boston_df[train_indices_boston, ]
+boston_test <- boston_df[-train_indices_boston, ]
+
+print(paste("Tamaño del conjunto de entrenamiento de Boston:", nrow(boston_train)))
+print(paste("Tamaño del conjunto de prueba de Boston:", nrow(boston_test)))
+```
+Entrenamos el árbol de regresión
+
+Usamos la función tree() para ajustar (entrenar) nuestro árbol de regresión. La fórmula medv ~ . significa que queremos predecir medv usando todas las demás variables como predictores. Los datos de entrenamiento son boston_train.
+
+```{r}
+boston_tree_fit <- tree(medv ~ ., data = boston_train)
+```
+
+Mostramos resultados y graficamos
+
+La función summary() nos da un resumen del árbol ajustado, incluyendo las variables utilizadas y el error de entrenamiento. Luego, usamos plot() y text() para visualizar el árbol. pretty = 0 ayuda a que los nombres de las variables se vean mejor en el gráfico.
+
+```{r}
+summary(boston_tree_fit) # Muestra un resumen del árbol
+```
+Quote de ISLR: Notice that the output of summary() indicates that only four of the variables have been used in constructing the tree. In the context of a regression tree, the deviance is simply the sum of squared errors for the tree. We now plot the tree.
+
+```{r}
+plot(boston_tree_fit) # Dibuja la estructura del árbol
+text(boston_tree_fit, pretty = 0, cex = 0.7) # Añade etiquetas al árbol
+title("Árbol de Regresión para Datos de Vivienda de Boston (Sin Podar)")
+```
+Validación cruzada para la poda
+
+La validación cruzada (CV) nos ayuda a determinar el tamaño óptimo del árbol (número de nodos terminales) para evitar el sobreajuste. cv.tree() realiza esta validación. Buscamos el tamaño del árbol que minimice la “desviación” (deviance) validada cruzadamente. FUN = prune.tree es adecuado para regresión.
+
+```{r}
+cv_boston_tree <- cv.tree(boston_tree_fit, FUN = prune.tree) # Realiza validación cruzada
+
+print("Resultados de la validación cruzada:")
+print(cv_boston_tree) # Muestra los resultados (tamaño, devianza, k)
+
+# Grafica la devianza vs. el tamaño del árbol
+plot(cv_boston_tree$size, cv_boston_tree$dev, type = "b",
+     xlab = "Tamaño del Árbol (Nº Nodos Terminales)", ylab = "Devianza CV")
+title("Devianza CV vs. Tamaño del Árbol (Boston)")
+
+# Identifica el tamaño con la mínima devianza CV
+optimal_size_boston <- cv_boston_tree$size[which.min(cv_boston_tree$dev)]
+print(paste("Tamaño óptimo del árbol según CV:", optimal_size_boston))
+# Marca el punto óptimo en el gráfico
+points(optimal_size_boston, min(cv_boston_tree$dev), col = "red", cex = 2, pch = 20)
+```
+Podar el árbol de regresión
+
+Podamos el árbol al tamaño sugerido por la validación cruzada usando la función prune.tree(). El argumento best toma el número de nodos terminales. El óptimo se encuentra en 7 nodos (igual que sin podar, pero si queremos ver otra configuración, podemos settear “best =5”, por ejemplo)
+
+```{r}
+boston_tree_pruned <- prune.tree(boston_tree_fit, best = 5) # Poda el árbol
+
+# Grafica el árbol podado
+plot(boston_tree_pruned)
+text(boston_tree_pruned, pretty = 0, cex = 0.8)
+title(paste("Árbol de Regresión Podado (Tamaño =", 5, ")"))
+```
+```{r}
+summary(boston_tree_pruned) # Muestra un resumen del árbol podado
+```
+Evaluar el árbol podado en el conjunto de prueba
+
+Hacemos predicciones con el árbol podado sobre el conjunto de prueba (boston_test) y calculamos el Error Cuadrático Medio (MSE) para evaluar su rendimiento en datos no vistos. Comparamos con el MSE del árbol sin podar.
+
+```{r}
+pred_boston_test <- predict(boston_tree_pruned, newdata = boston_test) # Predice en el conjunto de prueba
+mse_boston_test <- mean((pred_boston_test - boston_test$medv)^2) # Calcula el MSE
+
+print(paste("MSE en el conjunto de prueba de Boston (árbol podado):", round(mse_boston_test, 2)))
+
+# Para comparar, MSE del árbol sin podar en el conjunto de prueba
+pred_boston_unpruned_test <- predict(boston_tree_fit, newdata = boston_test)
+mse_boston_unpruned_test <- mean((pred_boston_unpruned_test - boston_test$medv)^2)
+print(paste("MSE en el conjunto de prueba de Boston (árbol sin podar):",
+            round(mse_boston_unpruned_test, 2)))
+```
+
+
+### Clasificación
+Cargamos los datos
+
+Utilizaremos el conjunto de datos Carseats del paquete ISLR. Necesitamos crear una variable de respuesta binaria. Crearemos HighSales, que será “Yes” si Sales > 8 y “No” en caso contrario.
+
 
 ```{r}
 set.seed(1)
@@ -37,6 +141,7 @@ head(carseats_df)
 ```{r}
 table(carseats_df$HighSales) # Muestra la distribución de clases
 ```
+
 Crear conjuntos de train y test
 
 ```{r}
