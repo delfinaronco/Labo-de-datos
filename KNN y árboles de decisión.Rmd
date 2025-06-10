@@ -475,22 +475,75 @@ No hay que podarlo (quedaría igual)
 
 
 ```{r}
-redicciones <- predict(tree_fit, prueba, type = "class")
+predicciones <- predict(tree_fit, prueba, type = "class")
+
+# Asegurar que los factores tienen los mismos niveles
+niveles_comunes <- union(levels(factor(predicciones)), levels(factor(prueba$nombre_com)))
+
+predicciones <- factor(predicciones, levels = niveles_comunes)
+reales <- factor(prueba$nombre_com, levels = niveles_comunes)
 
 # Matriz de confusión
-confusionMatrix(predicciones, prueba$nombre_com)
+confusionMatrix(predicciones, reales)
 
 # Precisión del modelo
 mean(predicciones == prueba$nombre_com)
 
 ```
+f) Analizar el modelo elegido 
+¿Qué atributo se utiliza en el primer corte?
 
 
 ```{r}
-precision(data = prueba, truth = Class, estimate = .pred_class)
+# Mostrar el atributo del primer corte
+tree_fit$frame[1, "var"]
+
+```
+En el primer corte se utiliza el atributo altura_tot
+
+g) Predecir especie de un nuevo árbol
+Árbol con altura = 22 m, diámetro = 56 cm, inclinación = 8°
+
+```{r}
+# Crear un nuevo árbol como data frame
+nuevo_arbol <- data.frame(
+  altura_tot = 22,
+  diametro = 56,
+  inclinacio = 8
+)
+
+# Predecir la especie con el modelo entrenado
+prediccion <- predict(tree_fit, nuevo_arbol, type = "class")
+
+# Mostrar resultado
+prediccion
+
 ```
 
-  
+h) Armar la matriz de confusión y calcular las métricas de desempeño vistas en clase
+
+La matriz de confusion ya la hicimos
+
+Calculamos la accuracy
+```{r}
+accuracy <- mean(predicciones == prueba$nombre_com)
+accuracy
+```
+
+luegio la precision
+```{r}
+conf <- confusionMatrix(predicciones, reales)
+
+# Mostrar precision por clase
+conf$byClass[, "Precision"]
+
+```
+
+ahora recall (numero total de correctos clasificados positivos&positivos en el set, o sea de las instancias positivas, cuántas fueron clasificadas como positivas)
+```{r}
+conf$byClass[, "Recall"]
+```
+
 
 
 
