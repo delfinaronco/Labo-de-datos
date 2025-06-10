@@ -429,6 +429,7 @@ d) Entrenar un árbol de decisión con diferentes configuraciones
 
 ```{r}
 # Dividir en entrenamiento (80%) y prueba (20%)
+library(tree)
 
 set.seed(42)
 indices <- createDataPartition(arboles$nombre_com, p = 0.8, list = FALSE)  
@@ -473,6 +474,21 @@ No hay que podarlo (quedaría igual)
 
 
 
+```{r}
+redicciones <- predict(tree_fit, prueba, type = "class")
+
+# Matriz de confusión
+confusionMatrix(predicciones, prueba$nombre_com)
+
+# Precisión del modelo
+mean(predicciones == prueba$nombre_com)
+
+```
+
+
+```{r}
+precision(data = prueba, truth = Class, estimate = .pred_class)
+```
 
   
 
