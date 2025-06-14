@@ -361,7 +361,173 @@ Outcome: 1 as diabetes detected & 0 as not detected
 
 a) Cargar y explorar el dataset
 
-# no está el dataset
+```{r}
+diabetes <- read.csv("diabetes.csv")
+
+str(diabetes)
+head(diabetes)
+
+summary(diabetes)
+```
+
+b) Preparar los datos (convertir el outcome a factor si es necesario, estandarizar las predictoras si corresponde, etc.)
+
+```{r}
+diabetes$Outcome <- as.factor(diabetes$Outcome)
+
+# Suponiendo que la variable respuesta se llama "Outcome"
+predictoras <- diabetes[, names(diabetes) != "Outcome"]
+
+# 4. Estandarizar
+predictoras_std <- as.data.frame(scale(predictoras))
+
+# 5. Unir de nuevo con la variable respuesta si la necesitas
+diabetes_std <- cbind(predictoras_std, Outcome = diabetes$Outcome)
+```
+
+c) Implementación del modelo KNN, entrenando con k = 7 vecinos. Evaluar su precisión en el conjunto de prueba.
+
+```{r}
+library(class)
+library(caret)
+set.seed(1)
+
+# Separar datos de entrenamiento y prueba
+datos_split <- initial_split(diabetes_std, prop = 0.75, strata = Outcome)
+
+datos_train <- training(datos_split)
+datos_test <- testing(datos_split) 
+
+# Podemos chequear las proporciones de clases en cada subset
+proportionstrain <- datos_train %>% 
+                      group_by(Outcome) %>% 
+                      summarize(n = n()) %>% 
+                      mutate(percent = 100*n/nrow(datos_train))
+proportionstrain
+```
+
+hacemos la receta
+
+```{r}
+datos_recipe <- recipe(Outcome ~ ., data = datos_train)
+```
+
+Entrenamiento del clasificador
+
+```{r}
+knn_spec <- nearest_neighbor(weight_func="rectangular", neighbors = 7) %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+```
+
+```{r}
+knn_fit <- workflow() %>%
+  add_recipe(datos_recipe) %>%
+  add_model(knn_spec) %>%
+  fit(data = datos_train)
+
+knn_fit
+```
+Ahora que tenemos un clasificador KNN, podemos usarlo para predecir las “etiquetas” de la clase del conjunto de datos de testeo.
+
+```{r}
+datos_test_predictions <- predict(knn_fit, datos_test) %>% 
+  bind_cols(datos_test)
+
+head(datos_test_predictions)
+```
+
+```{r}
+datos_test_predictions %>% 
+  metrics(truth = Outcome, estimate = .pred_class) %>% 
+  filter(.metric == "accuracy")
+```
+matriz de confusión
+
+```{r}
+confusion <- datos_test_predictions %>% 
+             conf_mat(truth = Outcome, estimate = .pred_class)
+confusion
+```
+
+precisión
+
+```{r}
+library(yardstick)
+
+yardstick::precision(data = datos_test_predictions, truth = Outcome, estimate = .pred_class)
+```
+
+
+d) Evaluar el desempeño del modelo para distintos valores de k
+d Extra) Variar el valor de k entre 1 y 30. Encontrar el valor de k que maximiza la “accuracy” en el conjunto de prueba. Graficar la precisión en función de k.
+
+La funcion confusionMatrixde la libreria caret puede ser de utilidad, o bien se puede utilizar el esquema de trabajo propuesto en library(tidymodels)
+
+```{r}
+# Evaluar accuracy para distintos valores de k entre 1 y 30
+valores_k <- 1:30
+resultados_k <- tibble()
+resultados_precision <- tibble()
+
+# Bucle para probar cada k
+for (k_val in valores_k) {
+  # Modelo KNN con k = k_val
+  modelo_knn <- nearest_neighbor(mode = "classification", neighbors = k_val) %>%
+    set_engine("kknn")
+
+  # Workflow con receta + modelo
+  flujo <- workflow() %>%
+    add_recipe(datos_recipe) %>%
+    add_model(modelo_knn)
+
+  # Entrenar y predecir
+  fit_knn <- fit(flujo, data = datos_train)
+
+  predicciones <- predict(fit_knn, new_data = datos_test) %>%
+    bind_cols(datos_test)
+
+
+  # Calcular accuracy
+  acc <- yardstick::accuracy(predicciones, truth = Outcome, estimate = .pred_class)
+
+  resultados_k <- bind_rows(resultados_k, tibble(k = k_val, accuracy = acc$.estimate))
+  
+  # Calcular precisión
+  
+  prec <- yardstick::precision(predicciones, truth = Outcome, estimate =.pred_class)
+  
+  resultados_precision <- bind_rows(resultados_precision, tibble(k = k_val, precision = prec$.estimate))
+  
+  }
+
+
+  resultados_k %>% filter(accuracy == max(accuracy))
+  resultados_precision %>% filter(precision == max(precision))
+```
+k = 23, 24, 25, 28, 29 y 30 tienen la mejor accuracy.
+k =7 tiene la mejor precisión
+
+```{r}
+    # Graficar accuracy
+  ggplot(resultados_k, aes(x = k, y = accuracy)) +
+    geom_line() +
+    geom_point() +
+    labs(title = "Accuracy del modelo KNN según k",
+         x = "Número de vecinos (k)",
+         y = "Accuracy en el conjunto de prueba") +
+    theme_minimal()
+    
+    # Graficar precisión vs. k
+  ggplot(resultados_precision, aes(x = k, y = precision)) +
+    geom_line() +
+    geom_point() +
+    labs(title = "Precisión del modelo KNN según k",
+         x = "Número de vecinos (k)",
+         y = "Precision en el conjunto de prueba") +
+    theme_minimal()
+```
+
 
 
 ## Ejercicio 4
@@ -429,6 +595,7 @@ d) Entrenar un árbol de decisión con diferentes configuraciones
 
 ```{r}
 # Dividir en entrenamiento (80%) y prueba (20%)
+
 library(tree)
 
 set.seed(42)
@@ -472,8 +639,6 @@ points(optimal_size, min(cv_tree$dev), col = "red", cex = 2, pch = 20)
 
 No hay que podarlo (quedaría igual)
 
-
-
 ```{r}
 predicciones <- predict(tree_fit, prueba, type = "class")
 
@@ -490,6 +655,7 @@ confusionMatrix(predicciones, reales)
 mean(predicciones == prueba$nombre_com)
 
 ```
+
 f) Analizar el modelo elegido 
 ¿Qué atributo se utiliza en el primer corte?
 
@@ -530,7 +696,7 @@ accuracy <- mean(predicciones == prueba$nombre_com)
 accuracy
 ```
 
-luegio la precision
+luego la precision
 ```{r}
 conf <- confusionMatrix(predicciones, reales)
 
@@ -544,6 +710,8 @@ ahora recall (numero total de correctos clasificados positivos&positivos en el s
 conf$byClass[, "Recall"]
 ```
 
+
+  
 
 
 
