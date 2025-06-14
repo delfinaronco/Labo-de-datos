@@ -9,7 +9,8 @@ output: html_document
 Objetivo: Formar 3 grupos de estaciones de monitoreo ambiental en función de sus características de contaminación, para asignar tres equipos de trabajo que se encarguen de su gestión y planificación.
 
 ```{r}
-setwd("/home/Estudiante/Documentos")
+# setwd("/home/Estudiante/Documentos")
+setwd("C:/Users/Usuario/OneDrive/Documentos/DATOS/labo de datos")
 
 Datos <- read.csv("DatosMetales_mod.csv")
 ```
@@ -114,3 +115,238 @@ fviz_nbclust(Datosz, kmeans, method = "wss", k.max = 10) +
   theme_minimal()
 ```
 
+Utilizando el método del codo sobre la suma de cuadrados intra-cluster (WSS), se observa un quiebre claro en k = 3, lo que indica que este es un buen número de grupos para representar la estructura de los datos.
+
+
+Agregar los clusters a los datos
+
+```{r}
+datos_cluster <- Datos %>%
+  mutate(cluster = factor(kmeans_res$cluster))
+```
+
+ Resumen por cluster
+ 
+```{r}
+# Promedios por grupo
+datos_cluster %>%
+  group_by(cluster) %>%
+  summarise(across(where(is.numeric), mean), .groups = "drop")
+```
+ 
+El Cluster 1 se caracteriza por altas concentraciones de metales pesados (Cd, Pb), lo cual sugiere contaminación elevada. El Cluster 2 presenta valores intermedios, mientras que el Cluster 3 tiene bajos niveles de metales y mejores condiciones fisicoquímicas, posiblemente asociado a sitios menos contaminados.
+
+
+### Ejercicio 2
+
+Objetivo: Realizar un análisis de agrupamiento utilizando el algoritmo K-means con el fin de identificar grupos de vehículos con características similares, a partir de variables cuantitativas de la base de datos mtcars.
+
+Para ello:
+
+  - Seleccionar dos o más variables numéricas de la base mtcars que se consideren relevantes para agrupar los autos (por ejemplo: mpg, hp, wt, disp, etc.).
+  
+  - Decidir si estandarizar las variables seleccionadas (y hacerlo).
+  
+  - Aplicár el algoritmo K-means para conformar k = 3 grupos de vehículos.
+  
+  - Visualizá los resultados en un gráfico de dispersión, identificando los clústeres obtenidos.
+  
+  - Analizá las características de cada grupo resultante e interpretá los posibles perfiles de vehículos que representa cada uno.
+  
+  
+```{r}
+data(mtcars)
+
+head(mtcars)
+```
+voy a seleccionar las variables mpg, hp y wt
+
+```{r}
+autos <- mtcars %>%
+  select(mpg, hp, wt)
+
+summary(autos)
+```
+estandarizo las variables seleccionadas
+
+```{r}
+autos_std <- as.data.frame(scale(autos))
+```
+
+Aplicár el algoritmo K-means para conformar k = 3 grupos de vehículos.
+
+```{r}
+kmeans_res <- kmeans(autos_std, 3, nstart = 25)  
+kmeans_res
+```
+
+```{r}
+visualizacion <- fviz_cluster(kmeans_res, data = autos_std, 
+             ellipse.type = "euclid",
+             palette = "jco",
+             ggtheme = theme_minimal())
+visualizacion
+```
+Analizá las características de cada grupo resultante e interpretá los posibles perfiles de vehículos que representa cada uno.
+
+```{r}
+autos_std %>%
+  mutate(cluster = kmeans_res$cluster) %>%
+  group_by(cluster) %>%
+  summarise(across(everything(), mean))
+```
+Variables consideradas:
+
+  - mpg (eficiencia del combustible)
+  
+  - hp (potencia del motor)
+  
+  - wt (peso del vehículo)
+
+Los valores están estandarizados (media 0, desvío estándar 1), por lo que se interpretan en relación al promedio general.
+
+*Cluster 1*
+
+  mpg: -0.02 → Promedio cercano al general.
+  
+  hp: -0.35 → Ligeramente menos potentes.
+  
+  wt: -0.10 → Peso medio-ligeramente menor al promedio.
+
+Interpretación:
+Vehículos equilibrados, con características promedio. No destacan ni por su eficiencia ni por su potencia o peso.
+
+*Cluster 2*
+  mpg: 1.66 → Muy eficientes (alto rendimiento).
+  
+  hp: -1.04 → Mucho menos potentes.
+  
+  wt: -1.37 → Vehículos livianos.
+
+Interpretación:
+Vehículos económicos y livianos, probablemente autos compactos con motores de baja potencia, pero muy buen consumo de combustible.
+
+*Cluster 3*
+  mpg: -0.96 → Poco eficientes.
+  
+  hp: 1.18 → Muy potentes.
+  
+  wt: 0.98 → Vehículos pesados.
+
+Interpretación:
+Vehículos grandes y potentes, como SUV o autos deportivos. Bajo rendimiento en consumo, compensado con alta potencia.
+
+Conclusión:
+Cada cluster representa un perfil de vehículo claramente diferenciado:
+
+Cluster 1: Promedio, sin características destacadas.
+
+Cluster 2: Autos chicos, eficientes y de baja potencia.
+
+Cluster 3: Autos grandes, potentes y con bajo rendimiento.
+
+
+### Ejercicio 3
+
+Clustering con tidyclust
+
+El libro https://datasciencebook.ca/clustering.html#k-means en el cappitulo 9 presenta un ejemplo para realizar un análisis de agrupamiento con la library(tidyclust) a partir de los datos penguins
+
+Seguir el capítulo y resolver el ejemplo en un script propio.
+
+```{r}
+library(tidyclust)
+
+data("penguins")
+
+penguins_reducido <- tibble::tibble(
+  bill_length_mm = c(39.2, 36.5, 34.5, 36.7, 38.1, 39.2, 36, 37.8, 46.5, 46.1, 47.8, 45, 49.1, 43.3, 46, 46.7, 52.2, 46.8),
+  flipper_length_mm = c(196, 182, 187, 187, 181, 190, 195, 193, 213, 215, 215, 220, 212, 208, 195, 195, 197, 189)
+)
+
+head(penguins_reducido)
+
+set.seed(1)
+```
+
+```{r}
+kmeans_recipe <- recipe(~ ., data=penguins_reducido) |>
+    step_normalize(all_predictors()) 
+kmeans_recipe
+
+```
+
+```{r}
+kmeans_spec <- k_means(num_clusters = 3) |>
+    set_engine("stats")
+kmeans_spec
+```
+
+```{r}
+kmeans_fit <- workflow() |>
+    add_recipe(kmeans_recipe) |>
+    add_model(kmeans_spec) |>
+    fit(data = penguins_reducido)
+
+kmeans_fit
+```
+```{r}
+clustered_data <- kmeans_fit |>
+                    augment(penguins_reducido)
+clustered_data
+```
+
+```{r}
+cluster_plot <- ggplot(clustered_data,
+  aes(x = flipper_length_mm,
+      y = bill_length_mm,
+      color = .pred_cluster),
+  size = 2) +
+  geom_point() +
+  labs(x = "Flipper Length",
+       y = "Bill Length",
+       color = "Cluster") +
+  scale_color_manual(values = c("steelblue",
+                                "darkorange",
+                                "goldenrod1")) +
+  theme(text = element_text(size = 12))
+
+cluster_plot
+```
+ we also need to select K by finding where the “elbow” occurs in the plot of total WSSD versus the number of clusters. We can obtain the total WSSD (tot.withinss) from our clustering with 3 clusters using the glance function.
+
+```{r}
+glance(kmeans_fit)
+```
+
+```{r}
+penguin_clust_ks <- tibble(num_clusters = 1:4)
+penguin_clust_ks
+```
+```{r}
+kmeans_spec <- k_means(num_clusters = tune()) |>
+    set_engine("stats")
+kmeans_spec
+```
+
+```{r}
+kmeans_results <- workflow() |>
+    add_recipe(kmeans_recipe) |>
+    add_model(kmeans_spec) |>
+    tune_cluster(resamples = apparent(penguins_reducido), grid = penguin_clust_ks) |>
+    collect_metrics()
+kmeans_results
+```
+no funciona
+
+```{r}
+library(factoextra)
+
+wss <- map_dbl(1:9, function(k) {
+  kmeans(penguins_reducido, centers = k, nstart = 25)$tot.withinss
+})
+
+plot(1:9, wss, type = "b", pch = 19, xlab = "Número de clusters (k)", ylab = "WSS")
+```
+
+El mejor k es el 3
